@@ -1,0 +1,18 @@
+1. Allocate memory in the pool
+2. Take the string from the user as input and mark the blocks as occupied (which blocks are occupied and which are not ('E' marks empty))
+3. Store the string in the superblock
+4. Append to the linked list
+
+How many building blocks are needed?
+	- In essence, how many "characters" are needed.
+
+
+For the allocateSuperBlockForString function, one of the requirements is that we need to determine how many building blocks are needed, and in essence, it says that how many characters are needed, and memory is to be allocated accordingly. I am confused as to what does the memory allocation part entails, since the initializeMemoryPool function initializes the memoryPool array to 64 characters. And then, we need to store the string in the superblock, for which, we will do block->string = str;
+Also, an additional confusion which I have is that how does the function finds the available space?
+Please explain everything in depth.
+
+
+
+In the constructor, there are only two parameters:
+- startIndex
+- SizeOfMemoryBlock

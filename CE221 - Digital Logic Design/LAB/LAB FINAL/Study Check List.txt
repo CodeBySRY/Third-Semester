@@ -1,0 +1,7 @@
+Verilog
+
+- MUX (Lab # 07)
+- Decoder
+- Verilog Behavior Modelling (Combinational Circuits)
+- FSMs in Verilog
+- Shift Registers in Verilog

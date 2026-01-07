@@ -1,0 +1,10 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  \
+"../../../../Smart Entry Gate Controller.srcs/sources_1/new/fsm_practice.v" \
+"../../../../Smart Entry Gate Controller.srcs/sim_1/new/fsm_practice_tb.v" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

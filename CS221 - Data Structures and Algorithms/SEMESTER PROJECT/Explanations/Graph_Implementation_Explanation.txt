@@ -1,0 +1,2714 @@
+================================================================================
+COMPREHENSIVE EXPLANATION: DEPARTMENT GRAPH IMPLEMENTATION
+================================================================================
+
+PROJECT: CareSync Hub - Hospital Management System
+MODULE: Department Referral Graph
+REQUIREMENTS: #6 (9 marks) and #7 (10 marks)
+FILE: src/Department.cpp
+AUTHOR: Technical Documentation
+DATE: Day 3 - Graph Implementation
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Graph Theory Fundamentals
+2. Data Structure Architecture
+3. Function-by-Function Analysis
+4. Algorithm Deep Dive: DFS
+5. Algorithm Deep Dive: BFS
+6. Memory Management
+7. Complexity Analysis
+8. Testing Strategy
+9. Viva Defense Points
+10. Common Pitfalls & Solutions
+
+================================================================================
+1. GRAPH THEORY FUNDAMENTALS
+================================================================================
+
+1.1 WHAT IS A GRAPH?
+────────────────────
+
+A graph G = (V, E) consists of:
+    V = Set of vertices (nodes)
+    E = Set of edges (connections between nodes)
+
+In our hospital system:
+    V = Departments (Cardiology, Neurology, etc.)
+    E = Referral relationships (one department can refer to another)
+
+1.2 DIRECTED vs UNDIRECTED GRAPHS
+──────────────────────────────────
+
+UNDIRECTED GRAPH:
+    Edge (A, B) means: A connects to B AND B connects to A
+    Example: Friendship (if A is friends with B, B is friends with A)
+    
+    Visual:
+        A ←→ B
+
+DIRECTED GRAPH (What We Use):
+    Edge (A, B) means: A connects to B (but B may NOT connect to A)
+    Example: Referrals (Cardiology can refer TO Neurology, but that doesn't
+             mean Neurology can automatically refer BACK to Cardiology)
+    
+    Visual:
+        A → B
+
+Why Directed for Referrals?
+    - Referrals are one-way relationships
+    - Specialization hierarchy: General → Specialist
+    - Example: Cardiology → Advanced Cardiac Surgery (specialized)
+              But Advanced Cardiac Surgery doesn't refer back to general Cardiology
+
+1.3 GRAPH REPRESENTATION METHODS
+─────────────────────────────────
+
+METHOD 1: ADJACENCY MATRIX
+───────────────────────────
+
+Representation:
+    2D array where matrix[i][j] = 1 if edge from i to j exists
+    
+Example with 4 departments:
+           Card  Neuro  Radio  Ortho
+    Card  [  0     1      1      0  ]
+    Neuro [  0     0      1      0  ]
+    Radio [  0     0      0      0  ]
+    Ortho [  0     1      0      0  ]
+
+Advantages:
+    ✓ O(1) edge lookup: Is there a referral from A to B?
+    ✓ Simple implementation
+    
+Disadvantages:
+    ✗ Space: O(V²) - wastes memory if few edges (sparse graph)
+    ✗ Adding vertex requires resizing entire matrix
+    ✗ Iterating over neighbors is O(V) even if only few neighbors
+
+When to Use:
+    - Dense graphs (many edges)
+    - Need frequent edge existence checks
+    - Fixed number of vertices
+
+METHOD 2: ADJACENCY LIST (What We Use)
+───────────────────────────────────────
+
+Representation:
+    Each vertex maintains a list of its outgoing edges
+    
+Example with same 4 departments:
+    Cardiology  → [Neurology] → [Radiology] → NULL
+    Neurology   → [Radiology] → NULL
+    Radiology   → NULL
+    Orthopedics → [Neurology] → NULL
+
+Advantages:
+    ✓ Space: O(V + E) - only stores actual edges
+    ✓ Adding vertex is easy (just add to list)
+    ✓ Iterating over neighbors is O(degree) - only actual neighbors
+    ✓ Dynamic size
+    
+Disadvantages:
+    ✗ Edge lookup: O(degree) to check if edge exists
+    
+When to Use:
+    - Sparse graphs (few edges relative to possible edges)
+    - Need to iterate over neighbors frequently
+    - Dynamic graph (vertices/edges added over time)
+
+Our Hospital Graph is SPARSE:
+    - Possible edges: V² (every department to every other)
+    - Actual edges: ~V (each department refers to 1-2 others typically)
+    - Sparsity = E / V² ≈ V / V² = 1/V (very sparse!)
+
+Therefore: Adjacency List is optimal for our use case.
+
+1.4 KEY GRAPH TERMINOLOGY
+─────────────────────────
+
+PATH:
+    Sequence of vertices connected by edges
+    Example: Cardiology → Neurology → Radiology
+    
+PATH LENGTH:
+    Number of edges in a path
+    Example above has length 2
+
+REACHABILITY:
+    Vertex B is reachable from vertex A if a path exists from A to B
+    
+CYCLE:
+    Path that starts and ends at the same vertex
+    Example: A → B → C → A
+    
+CONNECTED COMPONENT:
+    Subset of vertices where every vertex is reachable from every other
+    In directed graphs: "strongly connected" if bidirectional reachability
+
+================================================================================
+2. DATA STRUCTURE ARCHITECTURE
+================================================================================
+
+2.1 STRUCT DEFINITIONS
+──────────────────────
+
+struct DeptNode;  // Forward declaration
+
+struct DeptEdge {
+    DeptNode* to;      // Destination of this referral
+    DeptEdge* next;    // Next edge in this department's adjacency list
+};
+
+struct DeptNode {
+    char* name;           // Department name (dynamically allocated)
+    DeptEdge* firstEdge;  // Head of adjacency list (outgoing referrals)
+    DeptNode* next;       // Next department in global list
+};
+
+DeptNode* deptHead = nullptr;  // Global list of all departments
+
+2.2 MEMORY LAYOUT VISUALIZATION
+────────────────────────────────
+
+Scenario: Three departments with referrals:
+    Cardiology → Neurology
+    Cardiology → Radiology
+    Neurology → Radiology
+
+Memory Structure:
+
+┌─── GLOBAL DEPARTMENT LIST (deptHead) ───┐
+│                                          │
+│  deptHead                                │
+│     ↓                                    │
+│  ┌──────────────┐    ┌──────────────┐   │
+│  │ DeptNode     │───→│ DeptNode     │   │
+│  │ name: "Card" │    │ name: "Neuro"│   │
+│  │ firstEdge: ● │    │ firstEdge: ● │   │
+│  │ next: ●──────┘    │ next: ●──────┘   │
+│  └──────┬───────┘    └──────┬───────┘   │
+│         │                   │            │
+└─────────┼───────────────────┼────────────┘
+          │                   │
+          │                   │
+┌─────────▼─────────┐ ┌───────▼──────────┐
+│ ADJACENCY LIST    │ │ ADJACENCY LIST   │
+│ (Cardiology)      │ │ (Neurology)      │
+│                   │ │                  │
+│ ┌──────────────┐  │ │ ┌──────────────┐│
+│ │ DeptEdge     │  │ │ │ DeptEdge     ││
+│ │ to: Neuro ●──┼──┼─┼→│ to: Radio ●  ││
+│ │ next: ●──────┼─┐│ │ │ next: NULL   ││
+│ └──────────────┘ ││ │ └──────────────┘│
+│                  ││ │                  │
+│     ↓            ││ └──────────────────┘
+│ ┌──────────────┐ ││
+│ │ DeptEdge     │ ││
+│ │ to: Radio ●  │ ││
+│ │ next: NULL   │ ││
+│ └──────────────┘ ││
+└──────────────────┘│
+                    │
+                    └─→ [Points to Neurology DeptNode]
+
+Key Observations:
+
+1. TWO TYPES OF LINKED LISTS:
+   - Horizontal: Global department list (DeptNode->next)
+   - Vertical: Per-department edge list (DeptEdge->next)
+
+2. POINTER RELATIONSHIPS:
+   - DeptEdge->to: Points to a DeptNode (destination department)
+   - DeptNode->firstEdge: Points to first DeptEdge (adjacency list head)
+   - DeptNode->next: Points to next DeptNode (global list traversal)
+
+3. MEMORY LOCATIONS:
+   - All DeptNodes live in global list
+   - Each DeptNode "owns" its adjacency list (DeptEdges)
+   - DeptEdges don't own the nodes they point to (just references)
+
+2.3 WHY THIS STRUCTURE?
+───────────────────────
+
+DESIGN DECISION 1: Global department list (DeptNode->next)
+    
+    Purpose: Keep track of all departments in system
+    
+    Alternative: Hash table of departments by name
+        Pros: O(1) lookup by name
+        Cons: More complex, requires hash function, collision handling
+    
+    Our choice: Simple linked list
+        Pros: Easy to implement, easy to iterate all departments
+        Cons: O(V) lookup by name
+        Justification: V is small (~10-20 departments), O(V) is acceptable
+
+DESIGN DECISION 2: Adjacency list per department (DeptEdge linked list)
+    
+    Purpose: Store all outgoing referrals from a department
+    
+    Alternative: Array of pointers
+        struct DeptNode {
+            DeptNode* referrals[10];  // Fixed size
+        };
+        
+        Pros: Direct indexing
+        Cons: Fixed maximum, wastes space if few referrals
+    
+    Our choice: Linked list of edges
+        Pros: Dynamic, only uses space for actual referrals
+        Cons: Must traverse list to iterate
+        Justification: Each department has few referrals (~1-3), traversal is fast
+
+DESIGN DECISION 3: Separate DeptEdge struct (not just DeptNode* list)
+    
+    Current:
+        struct DeptEdge {
+            DeptNode* to;
+            DeptEdge* next;
+        };
+    
+    Alternative: List of DeptNode pointers directly
+        struct DeptNode {
+            DeptNode* firstReferral;
+            DeptNode* nextReferral;  // Confusing: next in adjacency list or global?
+        };
+        
+        Problem: Ambiguous pointers, harder to distinguish global list from edge list
+    
+    Our choice: Separate edge struct
+        Pros: Clear separation, extensible (could add edge weights/labels later)
+        Cons: Extra struct, slightly more memory
+        Justification: Clarity and extensibility outweigh minor memory cost
+
+================================================================================
+3. FUNCTION-BY-FUNCTION ANALYSIS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+FUNCTION 1: GetOrCreateDept()
+────────────────────────────────────────────────────────────────────────────
+
+SIGNATURE:
+    DeptNode* GetOrCreateDept(const char* name)
+
+PURPOSE:
+    Find a department by name in the global list.
+    If it doesn't exist, create it and add to the list.
+    Return pointer to the department node.
+
+WHY NEEDED?
+    When adding a referral "Cardiology → Neurology":
+        1. Need to get/create Cardiology node
+        2. Need to get/create Neurology node
+        3. Then create edge between them
+    
+    This function handles step 1 and 2.
+
+ALGORITHM:
+──────────
+
+    Step 1: Search existing departments
+        curr = deptHead
+        while curr != nullptr:
+            if curr->name equals name:
+                return curr  // Found!
+            curr = curr->next
+    
+    Step 2: Not found, create new department
+        Allocate new DeptNode
+        Copy name string (deep copy)
+        Initialize firstEdge = nullptr
+        Add to front of global list
+        Return new node
+
+CODE WALKTHROUGH:
+─────────────────
+
+Line 1: DeptNode* curr = deptHead;
+    Start at beginning of global department list
+
+Line 2-7: while (curr != nullptr) { ... }
+    Standard linked list traversal pattern
+    Check each node until nullptr (end of list)
+
+Line 3: if (CompareString(curr->name, name) == 0)
+    CompareString returns 0 if strings are equal
+    (From Utils.cpp: returns a[i] - b[i], so 0 means identical)
+
+Line 4: return curr;
+    Found existing department, return pointer to it
+    IMPORTANT: We don't create a duplicate
+
+Line 9: DeptNode* newDept = new DeptNode;
+    Department not found, allocate new node
+
+Line 10: newDept->name = CopyString(name);
+    CRITICAL: Deep copy the name string
+    
+    Why deep copy?
+        Parameter 'name' is a const char* - could be temporary
+        Example: GetOrCreateDept("Cardiology")
+            The string "Cardiology" might be a string literal (read-only memory)
+            Or it could be a local buffer that gets destroyed
+        
+        By copying, we OWN the memory, guaranteed to be valid as long as
+        DeptNode exists
+    
+    CopyString (from Utils.cpp):
+        1. Counts length of source string
+        2. Allocates new char array (length + 1 for null terminator)
+        3. Copies characters one by one
+        4. Adds null terminator
+        5. Returns pointer to new string
+
+Line 11: newDept->firstEdge = nullptr;
+    No referrals yet, adjacency list is empty
+
+Line 12: newDept->next = deptHead;
+    INSERT AT FRONT of global list
+    
+    Visual:
+        Before:  deptHead → [A] → [B] → NULL
+        
+        After:   deptHead → [newDept] → [A] → [B] → NULL
+                             ↑
+                        newDept->next = old deptHead
+
+Line 13: deptHead = newDept;
+    Update global head to point to new node
+    Now newDept is the first node in the list
+
+Line 15: return newDept;
+    Return pointer to newly created (or existing) department
+
+COMPLEXITY ANALYSIS:
+────────────────────
+
+Time Complexity: O(V) where V = number of departments
+    Breakdown:
+        - List traversal: O(V) worst case (department not found)
+        - String comparison: O(L) where L = length of name
+        - Combined: O(V * L)
+    
+    Best case: O(1) if department is first in list
+    Worst case: O(V * L) if department not found or is last
+
+Space Complexity: O(1) auxiliary
+    Only allocates space for new node if creating
+    No recursive calls, no temporary data structures
+
+DESIGN CHOICES:
+───────────────
+
+Choice 1: Insert at front (not end) of global list
+    Why?
+        - O(1) insertion (don't need to traverse to end)
+        - Order of departments doesn't matter for graph operations
+        - Simpler code (no need to track tail pointer)
+    
+    Trade-off:
+        ✓ Fast insertion
+        ✗ Departments appear in reverse order of creation
+           (But we don't care about order)
+
+Choice 2: Return existing node instead of creating duplicate
+    Why?
+        - Each department should exist exactly once
+        - Multiple edges can point to same node (many referrals to same dept)
+        - Avoids inconsistency (multiple nodes with same name)
+    
+    This ensures: "Neurology" always refers to the SAME DeptNode object
+
+Choice 3: Deep copy of name string
+    Why?
+        - Ownership: DeptNode owns its name, can free it later
+        - Safety: Source string might be temporary
+        - Independence: Modifications to source won't affect our copy
+
+EDGE CASES:
+───────────
+
+1. Empty list (deptHead == nullptr):
+   - Loop never executes
+   - Creates first department
+   - Sets deptHead to new node
+   - Works correctly ✓
+
+2. Duplicate name:
+   - Loop finds match, returns existing node
+   - No duplicate created ✓
+
+3. Name is empty string (""):
+   - CopyString allocates 1 byte (just null terminator)
+   - Creates node with empty name
+   - Technically works, but unusual case
+
+4. Name is very long (e.g., 1000 characters):
+   - CopyString handles any length
+   - Comparison is O(L) where L is length
+   - Works but slower for long names
+
+────────────────────────────────────────────────────────────────────────────
+FUNCTION 2: AddReferral()
+────────────────────────────────────────────────────────────────────────────
+
+SIGNATURE:
+    void AddReferral(const char* from, const char* to)
+
+PURPOSE:
+    Create a directed edge from one department to another.
+    Represents: "department 'from' can refer patients to department 'to'"
+
+PARAMETERS:
+    from: Name of source department
+    to: Name of destination department
+
+ALGORITHM:
+──────────
+
+    Step 1: Get/Create source department node
+        fromNode = GetOrCreateDept(from)
+    
+    Step 2: Get/Create destination department node
+        toNode = GetOrCreateDept(to)
+    
+    Step 3: Create new edge
+        Allocate DeptEdge
+        Set edge->to = toNode
+    
+    Step 4: Add edge to source's adjacency list
+        Insert at front of fromNode->firstEdge list
+
+CODE WALKTHROUGH:
+─────────────────
+
+Line 1: DeptNode* fromNode = GetOrCreateDept(from);
+    Ensure source department exists in graph
+    If it doesn't exist, creates it
+    Returns pointer to department node
+
+Line 2: DeptNode* toNode = GetOrCreateDept(to);
+    Ensure destination department exists in graph
+    Both departments guaranteed to exist after these two lines
+
+Line 4: DeptEdge* newEdge = new DeptEdge;
+    Allocate memory for new edge
+
+Line 5: newEdge->to = toNode;
+    Edge points to destination department
+    IMPORTANT: Edge does NOT copy the node, just stores pointer
+    Multiple edges can point to same destination
+
+Line 6: newEdge->next = fromNode->firstEdge;
+    INSERT AT FRONT pattern (same as global list insertion)
+    
+    Visual:
+        Before:  fromNode->firstEdge → [Edge1] → [Edge2] → NULL
+        
+        After:   fromNode->firstEdge → [newEdge] → [Edge1] → [Edge2] → NULL
+                                         ↑
+                                    newEdge->next = old firstEdge
+
+Line 7: fromNode->firstEdge = newEdge;
+    Update adjacency list head to point to new edge
+    newEdge is now first in the list
+
+COMPLEXITY ANALYSIS:
+────────────────────
+
+Time Complexity: O(V)
+    Breakdown:
+        - GetOrCreateDept(from): O(V)
+        - GetOrCreateDept(to): O(V)
+        - Edge creation and insertion: O(1)
+        - Total: O(V) + O(V) + O(1) = O(V)
+
+Space Complexity: O(1)
+    Allocates one DeptEdge (constant space)
+
+VISUAL EXAMPLE:
+───────────────
+
+Initial State:
+    deptHead → NULL (empty graph)
+
+Operation 1: AddReferral("Cardiology", "Neurology")
+    
+    After GetOrCreateDept("Cardiology"):
+        deptHead → [Cardiology: firstEdge=NULL] → NULL
+    
+    After GetOrCreateDept("Neurology"):
+        deptHead → [Neurology: firstEdge=NULL] → [Cardiology: firstEdge=NULL] → NULL
+    
+    After adding edge:
+        deptHead → [Neurology: firstEdge=NULL] → [Cardiology: firstEdge=●] → NULL
+                                                                            │
+                                                                            ↓
+                                                                    [Edge: to=Neurology, next=NULL]
+
+Operation 2: AddReferral("Cardiology", "Radiology")
+    
+    After GetOrCreateDept("Radiology"):
+        deptHead → [Radiology: ...] → [Neurology: ...] → [Cardiology: ...] → NULL
+    
+    After adding edge:
+        Cardiology's adjacency list:
+            [Edge: to=Radiology] → [Edge: to=Neurology] → NULL
+
+Final Graph:
+    Cardiology → Neurology
+    Cardiology → Radiology
+
+EDGE CASES:
+───────────
+
+1. Self-referral: AddReferral("Cardiology", "Cardiology")
+   - Creates edge from Cardiology to itself (self-loop)
+   - Code allows it (no check to prevent)
+   - In real hospital, unlikely but code handles it
+
+2. Duplicate edge: AddReferral("A", "B") called twice
+   - Creates TWO edges from A to B
+   - Wastes memory, but functionally okay (DFS/BFS still work)
+   - Could add check to prevent: traverse A's edges, check if B already exists
+   - Spec doesn't require prevention, so we allow it for simplicity
+
+3. Reverse edge: AddReferral("A", "B") then AddReferral("B", "A")
+   - Creates TWO directed edges: A→B and B→A
+   - This makes A and B mutually reachable
+   - Perfectly valid in directed graph
+
+DESIGN CHOICES:
+───────────────
+
+Choice 1: Create departments if they don't exist
+    Why?
+        - Convenience: Can call AddReferral without pre-creating departments
+        - Atomic operation: One function call sets up entire referral
+        - Matches intuitive API: "Add referral between X and Y"
+    
+    Alternative: Require explicit department creation first
+        AddDepartment("Cardiology");
+        AddDepartment("Neurology");
+        AddReferral("Cardiology", "Neurology");
+        
+        Pros: More explicit control
+        Cons: More verbose, error-prone (forget to create department)
+
+Choice 2: Insert edge at front of adjacency list
+    Why?
+        - O(1) insertion (fast)
+        - Order of edges doesn't matter for traversal
+        - Simpler code
+    
+    Trade-off:
+        ✓ Fast insertion
+        ✗ Edges appear in reverse order of addition
+           (But traversal algorithms don't care about order)
+
+Choice 3: Allow duplicate edges
+    Why?
+        - Simpler code (no duplicate checking)
+        - Rare in practice (unlikely to add same referral twice)
+        - Doesn't break correctness (DFS/BFS handle it)
+    
+    Cost:
+        - Extra memory for duplicate edges
+        - Slightly slower traversal (visit same neighbor multiple times)
+    
+    If duplicate prevention needed, add this before line 4:
+        DeptEdge* edge = fromNode->firstEdge;
+        while (edge != nullptr) {
+            if (edge->to == toNode) return;  // Already exists
+            edge = edge->next;
+        }
+
+────────────────────────────────────────────────────────────────────────────
+FUNCTION 3: IsVisited() - Helper Function
+────────────────────────────────────────────────────────────────────────────
+
+SIGNATURE:
+    bool IsVisited(DeptNode** visited, int visitedCount, DeptNode* node)
+
+PURPOSE:
+    Check if a node has been visited during graph traversal (DFS/BFS).
+
+PARAMETERS:
+    visited: Array of pointers to visited nodes
+    visitedCount: Number of nodes currently in visited array
+    node: Node to check
+
+RETURNS:
+    true if node is in visited array, false otherwise
+
+WHY NEEDED?
+    During DFS/BFS, we must track visited nodes to avoid:
+        1. Infinite loops (in case of cycles)
+        2. Processing same node multiple times (inefficient)
+    
+    Example of cycle:
+        A → B → C → A
+        
+        Without visited tracking:
+            Visit A → Visit B → Visit C → Visit A → Visit B → ... (infinite!)
+
+ALGORITHM:
+──────────
+
+    Linear search through visited array
+    
+    for i = 0 to visitedCount - 1:
+        if visited[i] == node:
+            return true
+    return false
+
+CODE WALKTHROUGH:
+─────────────────
+
+Line 1: for (int i = 0; i < visitedCount; i++)
+    Iterate through all visited nodes so far
+
+Line 2: if (visited[i] == node)
+    Compare POINTERS (not names)
+    
+    Why pointer comparison?
+        - Fast: O(1) comparison
+        - Each department has unique address
+        - No need to compare strings
+    
+    Example:
+        visited[0] = 0x1000 (Cardiology)
+        visited[1] = 0x2000 (Neurology)
+        node = 0x1000
+        
+        visited[0] == node → TRUE (both point to same memory location)
+
+Line 3: return true;
+    Found node in visited array
+
+Line 6: return false;
+    Loop completed without finding node
+
+COMPLEXITY ANALYSIS:
+────────────────────
+
+Time Complexity: O(V) where V = number of departments
+    Must check up to visitedCount nodes
+    In worst case, visitedCount = V (all nodes visited)
+
+Space Complexity: O(1)
+    No additional memory allocated
+
+ALTERNATIVE IMPLEMENTATIONS:
+────────────────────────────
+
+Alternative 1: Hash set (if STL allowed)
+    unordered_set<DeptNode*> visited;
+    visited.insert(node);
+    if (visited.count(node)) { ... }
+    
+    Time: O(1) average for lookup/insert
+    Space: O(V) for hash set
+    
+    We don't use because: STL not allowed per project rules
+
+Alternative 2: Visited flag in DeptNode
+    struct DeptNode {
+        char* name;
+        DeptEdge* firstEdge;
+        DeptNode* next;
+        bool visited;  // ADD THIS
+    };
+    
+    Pros:
+        - O(1) lookup: just check node->visited
+        - No need for visited array
+    
+    Cons:
+        - Modifies node structure (pollutes with traversal-specific data)
+        - Can't run multiple simultaneous traversals
+        - Must reset flags after each traversal
+    
+    We don't use because:
+        - Cleaner to keep traversal state separate
+        - More flexible (can have multiple active traversals)
+
+Alternative 3: Visited boolean array indexed by node ID
+    bool visited[100];  // If nodes have numeric IDs 0-99
+    visited[node->id] = true;
+    if (visited[node->id]) { ... }
+    
+    Pros:
+        - O(1) lookup
+        - Simple
+    
+    Cons:
+        - Requires nodes to have numeric IDs
+        - Our nodes only have string names
+        - Would need to assign IDs or use hash function
+    
+    We don't use because: Nodes don't have IDs, would need to add complexity
+
+Our Choice: Linear search
+    Pros:
+        - Simple to implement
+        - No modifications to node structure
+        - Works with any node type
+        - No STL needed
+    
+    Cons:
+        - O(V) lookup time
+    
+    Justification:
+        - V is small (~10-20 departments)
+        - O(V) is acceptable for small V
+        - Simplicity trumps optimization for this use case
+
+────────────────────────────────────────────────────────────────────────────
+FUNCTION 4: DFS_Helper() - Depth-First Search Helper
+────────────────────────────────────────────────────────────────────────────
+
+SIGNATURE:
+    void DFS_Helper(DeptNode* node, DeptNode** visited, int& visitedCount)
+
+PURPOSE:
+    Recursively explore all nodes reachable from given node using DFS.
+    Mark visited nodes and print newly discovered nodes.
+
+PARAMETERS:
+    node: Current node being explored
+    visited: Array tracking visited nodes (modified)
+    visitedCount: Current count of visited nodes (modified by reference)
+
+ALGORITHM:
+──────────
+
+    Depth-First Search (Recursive)
+    
+    1. Mark current node as visited
+    2. For each neighbor of current node:
+        a. If neighbor not visited:
+            i. Print neighbor (newly discovered)
+            ii. Recursively DFS from neighbor
+
+DEPTH-FIRST SEARCH EXPLAINED:
+──────────────────────────────
+
+Analogy: Exploring a maze
+    - Go as deep as possible down one path before backtracking
+    - Like: "Take left tunnel until dead end, then backtrack and try right"
+
+Visual Example:
+
+    Graph:
+        A → B → D
+        A → C
+
+    DFS(A):
+        Step 1: Visit A
+        Step 2: Explore A's edges
+            Edge to B:
+                Step 3: Visit B (recursive call)
+                Step 4: Explore B's edges
+                    Edge to D:
+                        Step 5: Visit D (recursive call)
+                        Step 6: Explore D's edges (none)
+                        Step 7: Return from D
+                Step 8: Return from B
+            Edge to C:
+                Step 9: Visit C (recursive call)
+                Step 10: Explore C's edges (none)
+                Step 11: Return from C
+        Step 12: Return from A
+    
+    Order visited: A, B, D, C
+    
+    Notice: Goes DEEP (A→B→D) before exploring other branch (A→C)
+
+Compare to BFS (Breadth-First):
+    Would visit: A, B, C, D
+    (Level-by-level: first A, then A's neighbors, then their neighbors)
+
+CODE WALKTHROUGH:
+─────────────────
+
+Line 1: visited[visitedCount++] = node;
+    Mark current node as visited
+    
+    Breakdown:
+        visited[visitedCount] = node;  // Add to visited array
+        visitedCount++;                // Increment count
+    
+    Why post-increment?
+        Uses current visitedCount as index, then increments
+        Example:
+            visitedCount = 2
+            visited[2] = node  (stores at index 2)
+            visitedCount = 3   (now points to next free slot)
+
+Line 3: DeptEdge* edge = node->firstEdge;
+    Start at first edge in adjacency list
+
+Line 4: while (edge != nullptr)
+    Traverse all edges from current node
+    Standard linked list traversal pattern
+
+Line 5: DeptNode* neighbor = edge->to;
+    Get destination node of this edge
+
+Line 7: if (!IsVisited(visited, visitedCount, neighbor))
+    Check if neighbor has been visited
+    
+    Why check?
+        1. Avoid cycles (infinite recursion)
+        2. Avoid printing same node multiple times
+    
+    Example:
+        Graph: A → B → C
+               A → C
+        
+        Without check:
+            Visit A
+            Explore A→B
+                Visit B
+                Explore B→C
+                    Visit C (print C)
+            Explore A→C
+                Visit C (print C AGAIN!) ← Duplicate
+
+Line 8: cout << "  - " << neighbor->name << "\n";
+    Print newly discovered neighbor
+    
+    Note: We print BEFORE recursive call
+    This is "pre-order" DFS (print when discovered, not when finished)
+
+Line 9: DFS_Helper(neighbor, visited, visitedCount);
+    RECURSIVE CALL: Explore from neighbor
+    
+    Recursion Stack Trace:
+        DFS_Helper(A)
+            Print B
+            DFS_Helper(B)
+                Print D
+                DFS_Helper(D)
+                    (no neighbors)
+                return
+            return
+            Print C
+            DFS_Helper(C)
+                (no neighbors)
+            return
+        return
+
+Line 13: edge = edge->next;
+    Move to next edge in adjacency list
+
+RECURSION EXPLAINED:
+────────────────────
+
+How Recursion Works Here:
+
+    1. Function calls itself with different node
+    2. Each call has its own local variables (edge, neighbor)
+    3. Calls stack up until base case (node with no unvisited neighbors)
+    4. Then unwind back up the stack
+
+Call Stack Example:
+
+    Graph: A → B → C
+
+    Initial call: DFS_Helper(A)
+        ┌──────────────────────────┐
+        │ DFS_Helper(A)            │
+        │ edge = A->firstEdge      │
+        │ neighbor = B             │
+        └──────────────────────────┘
+    
+    Calls DFS_Helper(B):
+        ┌──────────────────────────┐
+        │ DFS_Helper(B)            │ ← Current execution
+        │ edge = B->firstEdge      │
+        │ neighbor = C             │
+        └──────────────────────────┘
+        ┌──────────────────────────┐
+        │ DFS_Helper(A)            │ ← Paused, waiting
+        │ edge = A->firstEdge      │
+        └──────────────────────────┘
+    
+    Calls DFS_Helper(C):
+        ┌──────────────────────────┐
+        │ DFS_Helper(C)            │ ← Current execution
+        │ edge = C->firstEdge=NULL │
+        └──────────────────────────┘
+        ┌──────────────────────────┐
+        │ DFS_Helper(B)            │ ← Paused
+        └──────────────────────────┘
+        ┌──────────────────────────┐
+        │ DFS_Helper(A)            │ ← Paused
+        └──────────────────────────┘
+    
+    C has no neighbors, returns:
+        ┌──────────────────────────┐
+        │ DFS_Helper(B)            │ ← Resumes
+        │ edge = edge->next = NULL │
+        └──────────────────────────┘
+        ┌──────────────────────────┐
+        │ DFS_Helper(A)            │ ← Still paused
+        └──────────────────────────┘
+    
+    B loop ends, returns:
+        ┌──────────────────────────┐
+        │ DFS_Helper(A)            │ ← Resumes
+        │ edge = edge->next        │
+        └──────────────────────────┘
+    
+    A loop ends, returns:
+        (Stack empty, traversal complete)
+
+Base Case (Implicit):
+    When a node has no unvisited neighbors, the while loop doesn't execute
+    any recursive calls, and the function returns naturally.
+    This is how recursion stops.
+
+COMPLEXITY ANALYSIS:
+────────────────────
+
+Time Complexity: O(V + E)
+    V = number of vertices (departments)
+    E = number of edges (referrals)
+    
+    Breakdown:
+        - Each vertex visited at most once: O(V)
+        - Each edge examined at most once: O(E)
+        - Total: O(V + E)
+    
+    Why each edge only once?
+        When we visit a node, we check all its edges
+        But we only recurse if neighbor unvisited
+        So each edge leads to at most one recursive call
+
+Space Complexity: O(V)
+    Recursion stack depth = longest path in graph
+    Worst case: Linear graph A→B→C→...→Z
+    Stack would have V frames
+    
+    Best case: Star graph (all nodes connect to one center)
+    Stack would have depth 2 (center, then any leaf)
+
+EDGE CASES:
+───────────
+
+1. Node with no outgoing edges:
+   - edge = node->firstEdge = nullptr
+   - while loop never executes
+   - Function returns immediately
+   - Correct ✓
+
+2. Node already fully explored (all neighbors visited):
+   - while loop executes but IsVisited returns true for all
+   - No recursive calls made
+   - Function returns
+   - Correct ✓
+
+3. Cycle in graph: A → B → C → A
+   - Visit A (mark visited)
+   - Recurse to B (mark visited)
+   - Recurse to C (mark visited)
+   - C has edge back to A, but A already visited
+   - IsVisited returns true, no recursion
+   - Cycle broken ✓
+
+────────────────────────────────────────────────────────────────────────────
+FUNCTION 5: ListReachableDepartments() - Main DFS Interface
+────────────────────────────────────────────────────────────────────────────
+
+SIGNATURE:
+    void ListReachableDepartments(const char* startDeptName)
+
+PURPOSE:
+    Find and print all departments reachable from a given starting department.
+    Implements Requirement 6 (9 marks).
+
+EXAMPLE:
+    Graph:
+        Cardiology → Neurology → Radiology
+        Cardiology → Orthopedics
+    
+    ListReachableDepartments("Cardiology")
+    Output:
+        Departments reachable from Cardiology:
+          - Neurology
+          - Radiology
+          - Orthopedics
+
+ALGORITHM:
+──────────
+
+    1. Find starting department node by name
+    2. If not found, print error and return
+    3. Initialize visited array, mark start as visited
+    4. For each neighbor of start:
+        a. If not visited:
+            i. Print neighbor name
+            ii. Recursively DFS from neighbor
+    5. If no neighbors, print "none"
+
+CODE WALKTHROUGH:
+─────────────────
+
+Lines 1-8: Find starting department
+    DeptNode* startNode = nullptr;
+    DeptNode* curr = deptHead;
+    while (curr != nullptr) {
+        if (CompareString(curr->name, startDeptName) == 0) {
+            startNode = curr;
+            break;
+        }
+        curr = curr->next;
+    }
+    
+    Standard linked list search pattern
+    Could use GetOrCreateDept, but we DON'T want to create if not found
+    (Requirement: report error if department doesn't exist)
+
+Lines 10-13: Error handling
+    if (startNode == nullptr) {
+        cout << "Department '" << startDeptName << "' not found.\n";
+        return;
+    }
+    
+    Defensive programming: handle invalid input gracefully
+
+Lines 15-16: Initialize visited tracking
+    DeptNode* visited[100];
+    int visitedCount = 0;
+    
+    Assumption: Maximum 100 departments
+    Could make dynamic, but fixed size simpler for this project
+
+Line 17: visited[visitedCount++] = startNode;
+    Mark starting node as visited BEFORE exploring
+    
+    Why?
+        - Starting node should not appear in "reachable" list
+        - We want reachable FROM start, not including start itself
+        - If we don't mark it, cycle back to start would cause issues
+
+Line 19: cout << "\nDepartments reachable from " << startDeptName << ":\n";
+    Print header
+
+Lines 21-22: Edge traversal setup
+    DeptEdge* edge = startNode->firstEdge;
+    bool foundAny = false;
+    
+    foundAny tracks if we found at least one reachable department
+    Used to print "none" message if no neighbors
+
+Lines 24-32: Main traversal loop
+    while (edge != nullptr) {
+        DeptNode* neighbor = edge->to;
+        if (!IsVisited(visited, visitedCount, neighbor)) {
+            foundAny = true;
+            cout << "  - " << neighbor->name << "\n";
+            DFS_Helper(neighbor, visited, visitedCount);
+        }
+        edge = edge->next;
+    }
+    
+    For each edge from start:
+        1. Get neighbor
+        2. If unvisited:
+            a. Mark found something
+            b. Print neighbor (first level of reachability)
+            c. Recursively explore from neighbor (deeper levels)
+        3. Move to next edge
+
+Lines 34-36: Handle empty case
+    if (!foundAny) {
+        cout << "  (No reachable departments)\n";
+    }
+    
+    Provides clear feedback when no neighbors exist
+
+TRACE EXAMPLE:
+──────────────
+
+Graph:
+    Cardiology → Neurology → Radiology
+    Cardiology → Orthopedics → Surgery
+
+Call: ListReachableDepartments("Cardiology")
+
+Execution:
+
+    Step 1: Find Cardiology node ✓
+    
+    Step 2: Initialize visited
+        visited = [Cardiology]
+        visitedCount = 1
+    
+    Step 3: Print header
+        "Departments reachable from Cardiology:"
+    
+    Step 4: First edge: Cardiology → Neurology
+        IsVisited(Neurology)? No
+        Print "  - Neurology"
+        DFS_Helper(Neurology):
+            Mark Neurology visited
+            visited = [Cardiology, Neurology]
+            Edge: Neurology → Radiology
+                IsVisited(Radiology)? No
+                Print "  - Radiology"
+                DFS_Helper(Radiology):
+                    Mark Radiology visited
+                    visited = [Cardiology, Neurology, Radiology]
+                    No edges from Radiology
+                    Return
+            Return
+    
+    Step 5: Second edge: Cardiology → Orthopedics
+        IsVisited(Orthopedics)? No
+        Print "  - Orthopedics"
+        DFS_Helper(Orthopedics):
+            Mark Orthopedics visited
+            visited = [Cardiology, Neurology, Radiology, Orthopedics]
+            Edge: Orthopedics → Surgery
+                IsVisited(Surgery)? No
+                Print "  - Surgery"
+                DFS_Helper(Surgery):
+                    Mark Surgery visited
+                    visited = [Cardiology, Neurology, Radiology, Orthopedics, Surgery]
+                    No edges from Surgery
+                    Return
+            Return
+    
+    Step 6: No more edges from Cardiology
+    
+    Final Output:
+        Departments reachable from Cardiology:
+          - Neurology
+          - Radiology
+          - Orthopedics
+          - Surgery
+
+Notice: Printed in DFS order (depth-first, not breadth-first)
+
+COMPLEXITY ANALYSIS:
+────────────────────
+
+Time Complexity: O(V + E)
+    Same as DFS_Helper, since we're doing DFS
+
+Space Complexity: O(V)
+    - visited array: O(V)
+    - Recursion stack: O(V)
+    - Total: O(V)
+
+DESIGN CHOICES:
+───────────────
+
+Choice 1: Don't include starting node in reachable list
+    Why?
+        - Semantically clearer: "reachable FROM X" means other nodes
+        - Matches common graph terminology
+        - Self-reachability is trivial (every node reaches itself)
+    
+    Alternative: Include starting node
+        Would need to print it first
+        Less intuitive output
+
+Choice 2: Print during DFS, not after
+    Why?
+        - Immediate output (user sees results as they're found)
+        - Don't need to store results
+        - Simpler code
+    
+    Alternative: Store results, then print
+        Could sort results alphabetically
+        But spec doesn't require sorting
+
+Choice 3: Use DFS instead of BFS
+    Why?
+        - Both find all reachable nodes (result is same)
+        - DFS is simpler to implement with recursion
+        - No queue needed
+        - For "reachability", order doesn't matter
+    
+    When BFS is better:
+        - Need shortest paths (BFS finds shortest first)
+        - Need level-by-level exploration
+        - For this requirement, DFS is sufficient
+
+================================================================================
+4. ALGORITHM DEEP DIVE: DEPTH-FIRST SEARCH (DFS)
+================================================================================
+
+4.1 WHAT IS DFS?
+────────────────
+
+Depth-First Search is a graph traversal algorithm that:
+    1. Starts at a source node
+    2. Explores as far as possible along each branch before backtracking
+    3. Uses a stack (explicitly or via recursion)
+
+Analogy: Exploring a maze
+    "Take the first path, go as deep as possible. When you hit a dead end
+    or already-visited area, backtrack and try the next path."
+
+4.2 DFS vs BFS COMPARISON
+─────────────────────────
+
+DEPTH-FIRST SEARCH (DFS):
+    Order: Goes deep first
+    Data Structure: Stack (or recursion)
+    
+    Graph:     A
+              / \
+             B   C
+            /     \
+           D       E
+    
+    DFS Order: A, B, D, C, E
+    (Goes A→B→D deep, then backtracks to explore C→E)
+
+BREADTH-FIRST SEARCH (BFS):
+    Order: Goes level by level
+    Data Structure: Queue
+    
+    Same Graph:
+    BFS Order: A, B, C, D, E
+    (Explores all of A's neighbors first, then their neighbors)
+
+When to Use Each:
+
+    DFS:
+        ✓ Finding any path (not necessarily shortest)
+        ✓ Detecting cycles
+        ✓ Topological sorting
+        ✓ Maze solving (find ANY exit)
+        ✓ Simpler to code with recursion
+    
+    BFS:
+        ✓ Shortest path in unweighted graph
+        ✓ Finding nearest neighbors
+        ✓ Level-order traversal
+        ✓ Testing bipartiteness
+
+4.3 DFS IMPLEMENTATION PATTERNS
+───────────────────────────────
+
+PATTERN 1: Recursive DFS (What We Use)
+
+void DFS(node):
+    mark node as visited
+    for each neighbor of node:
+        if neighbor not visited:
+            DFS(neighbor)
+
+Pros:
+    ✓ Elegant and concise
+    ✓ Call stack manages backtracking automatically
+    ✓ Easy to understand
+
+Cons:
+    ✗ Stack overflow risk for very deep graphs
+    ✗ Less control over traversal
+
+PATTERN 2: Iterative DFS (Using Explicit Stack)
+
+void DFS(start):
+    stack.push(start)
+    while stack not empty:
+        node = stack.pop()
+        if node not visited:
+            mark node as visited
+            for each neighbor of node:
+                stack.push(neighbor)
+
+Pros:
+    ✓ No recursion (no stack overflow)
+    ✓ More control over traversal
+    ✓ Can pause and resume
+
+Cons:
+    ✗ More code
+    ✗ Must manually manage stack
+
+We use recursive because:
+    - Simpler code
+    - Graph depth is small (~5-10 departments deep)
+    - No risk of stack overflow
+
+4.4 DFS TRACE WITH CALL STACK
+──────────────────────────────
+
+Graph:
+    A → B → D
+    A → C
+
+DFS(A) Call Sequence:
+
+Step 1: DFS(A) called
+    Stack: [DFS(A)]
+    Mark A visited
+    Neighbors: B, C
+    Process B first
+
+Step 2: DFS(B) called
+    Stack: [DFS(A), DFS(B)]
+    Mark B visited
+    Neighbors: D
+    Process D
+
+Step 3: DFS(D) called
+    Stack: [DFS(A), DFS(B), DFS(D)]
+    Mark D visited
+    Neighbors: none
+    No recursive calls
+
+Step 4: DFS(D) returns
+    Stack: [DFS(A), DFS(B)]
+    Back in DFS(B)
+    No more neighbors
+
+Step 5: DFS(B) returns
+    Stack: [DFS(A)]
+    Back in DFS(A)
+    Still have C to process
+
+Step 6: DFS(C) called
+    Stack: [DFS(A), DFS(C)]
+    Mark C visited
+    Neighbors: none
+    No recursive calls
+
+Step 7: DFS(C) returns
+    Stack: [DFS(A)]
+    Back in DFS(A)
+    No more neighbors
+
+Step 8: DFS(A) returns
+    Stack: []
+    Traversal complete
+
+Visited Order: A, B, D, C
+
+4.5 DFS PROPERTIES
+──────────────────
+
+COMPLETENESS:
+    ✓ DFS will visit all reachable nodes (if we track visited)
+    ✗ Without visited tracking, can loop infinitely on cycles
+
+OPTIMALITY:
+    ✗ Path found may not be shortest
+    Example: A→B→C vs A→D→C (both go to C, but different lengths)
+    DFS finds first path, not shortest
+
+TIME COMPLEXITY:
+    O(V + E) where V=vertices, E=edges
+    Each vertex visited once
+    Each edge examined once
+
+SPACE COMPLEXITY:
+    O(V) for recursion stack
+    Worst case: Linear chain of V nodes
+
+4.6 COMMON DFS APPLICATIONS
+───────────────────────────
+
+Application 1: Cycle Detection
+    Run DFS, if we encounter a visited node that's still in current path,
+    there's a cycle.
+
+Application 2: Connected Components
+    Run DFS from each unvisited node, count how many times DFS is called.
+
+Application 3: Topological Sort
+    In a DAG (Directed Acyclic Graph), DFS gives topological order (with
+    post-order processing).
+
+Application 4: Maze Solving
+    DFS naturally explores all paths until it finds exit.
+
+Our Application: Reachability
+    We use DFS to find all nodes reachable from a start node.
+    Perfect fit because we don't care about path length, just "can we get there?"
+
+================================================================================
+5. ALGORITHM DEEP DIVE: BREADTH-FIRST SEARCH (BFS)
+================================================================================
+
+5.1 WHAT IS BFS?
+────────────────
+
+Breadth-First Search is a graph traversal algorithm that:
+    1. Starts at a source node
+    2. Explores all neighbors at current level before moving to next level
+    3. Uses a queue
+
+Analogy: Ripples in water
+    "Drop a stone in water. The first ripple spreads to all nearby points.
+    Then the second ripple spreads further. Each ripple is a 'level'."
+
+5.2 BFS ALGORITHM
+─────────────────
+
+Pseudocode:
+
+BFS(start):
+    queue.enqueue(start)
+    mark start as visited
+    
+    while queue not empty:
+        node = queue.dequeue()
+        process(node)
+        
+        for each neighbor of node:
+            if neighbor not visited:
+                mark neighbor as visited
+                queue.enqueue(neighbor)
+
+Key Insight: Use FIFO queue (First In, First Out)
+    - Ensures nodes are explored in order of distance from start
+    - First nodes enqueued are first to be explored (level by level)
+
+5.3 BFS TRACE EXAMPLE
+─────────────────────
+
+Graph:
+    A → B → D
+    A → C → E
+
+BFS(A):
+
+Initial:
+    Queue: [A]
+    Visited: {A}
+
+Iteration 1:
+    Dequeue A
+    Process: A
+    Neighbors: B, C (not visited)
+    Enqueue: B, C
+    Queue: [B, C]
+    Visited: {A, B, C}
+
+Iteration 2:
+    Dequeue B
+    Process: B
+    Neighbors: D (not visited)
+    Enqueue: D
+    Queue: [C, D]
+    Visited: {A, B, C, D}
+
+Iteration 3:
+    Dequeue C
+    Process: C
+    Neighbors: E (not visited)
+    Enqueue: E
+    Queue: [D, E]
+    Visited: {A, B, C, D, E}
+
+Iteration 4:
+    Dequeue D
+    Process: D
+    Neighbors: none
+    Queue: [E]
+    Visited: {A, B, C, D, E}
+
+Iteration 5:
+    Dequeue E
+    Process: E
+    Neighbors: none
+    Queue: []
+    Visited: {A, B, C, D, E}
+
+Result: Explored in order A, B, C, D, E
+    Level 0: A
+    Level 1: B, C
+    Level 2: D, E
+
+5.4 WHY BFS FOR SHORTEST PATH?
+───────────────────────────────
+
+Theorem: In unweighted graphs, BFS finds the shortest path.
+
+Proof Intuition:
+    - BFS explores nodes level by level
+    - Level k contains all nodes at distance k from start
+    - When we first reach a node, it's via the shortest path
+    - (Because all shorter paths were explored in earlier levels)
+
+Example:
+
+    Graph:
+        A → B → E
+        A → C → D → E
+
+    Shortest path A to E?
+
+    BFS explores:
+        Level 0: A
+        Level 1: B, C
+        Level 2: E (via B), D
+        
+        Found E at level 2 via path A→B→E (length 2)
+        
+        Even though there's another path A→C→D→E (length 3),
+        BFS finds E earlier via the shorter path.
+
+Contrast with DFS:
+    DFS might explore A→C→D→E first (length 3)
+    And never realize A→B→E is shorter (length 2)
+
+5.5 BFS FOR SHORTEST PATH IMPLEMENTATION
+─────────────────────────────────────────
+
+Challenge: BFS finds the distance, but how do we reconstruct the PATH?
+
+Solution: Track parent pointers
+
+Algorithm with Path Reconstruction:
+
+BFS_with_path(start, target):
+    queue.enqueue(start)
+    visited = {start}
+    parent[start] = null
+    
+    while queue not empty:
+        node = queue.dequeue()
+        
+        if node == target:
+            // Reconstruct path
+            path = []
+            current = target
+            while current != null:
+                path.prepend(current)
+                current = parent[current]
+            return path
+        
+        for each neighbor of node:
+            if neighbor not visited:
+                visited.add(neighbor)
+                parent[neighbor] = node  // Remember how we got here
+                queue.enqueue(neighbor)
+    
+    return null  // No path found
+
+Example:
+
+    Graph: A → B → D
+           A → C
+
+    BFS(A) to find path to D:
+    
+    Iteration 1:
+        Dequeue A
+        Neighbors: B, C
+        parent[B] = A
+        parent[C] = A
+    
+    Iteration 2:
+        Dequeue B
+        Neighbors: D
+        parent[D] = B
+    
+    Iteration 3:
+        Dequeue D (target!)
+        Reconstruct path:
+            current = D
+            path = [D]
+            current = parent[D] = B
+            path = [B, D]
+            current = parent[B] = A
+            path = [A, B, D]
+            current = parent[A] = null
+            Stop
+        
+        Return: [A, B, D]
+
+5.6 OUR BFS IMPLEMENTATION
+──────────────────────────
+
+In ShortestReferralPath(), we implement BFS with:
+
+1. Queue struct (simple array-based queue)
+    - enqueue(node): Add to back
+    - dequeue(): Remove from front
+    - isEmpty(): Check if front >= back
+
+2. ParentMap struct (tracks parent pointers)
+    - set(node, parent): Store parent of node
+    - get(node): Retrieve parent of node
+    - Uses parallel arrays (not hash map, since no STL)
+
+3. Visited array (same as DFS)
+    - Tracks which nodes have been visited
+
+Key Difference from DFS:
+    - DFS uses recursion (stack implicit in call stack)
+    - BFS uses explicit queue (level-order exploration)
+
+5.7 BFS PROPERTIES
+──────────────────
+
+COMPLETENESS:
+    ✓ BFS will visit all reachable nodes
+
+OPTIMALITY:
+    ✓ In unweighted graphs, finds shortest path
+    ✗ In weighted graphs, need Dijkstra's algorithm instead
+
+TIME COMPLEXITY:
+    O(V + E) where V=vertices, E=edges
+    Each vertex visited once
+    Each edge examined once
+
+SPACE COMPLEXITY:
+    O(V) for queue
+    Worst case: All nodes at same level (e.g., star graph)
+
+5.8 BFS vs DFS SUMMARY
+──────────────────────
+
+┌─────────────────┬────────────────┬─────────────────┐
+│ Property        │ DFS            │ BFS             │
+├─────────────────┼────────────────┼─────────────────┤
+│ Data Structure  │ Stack          │ Queue           │
+│ Implementation  │ Recursion easy │ Queue required  │
+│ Path Found      │ Any path       │ Shortest path   │
+│ Memory          │ O(h)* depth    │ O(w)* width     │
+│ Use For         │ Reachability   │ Shortest path   │
+│                 │ Cycles         │ Nearest neighbor│
+│                 │ Topology       │ Levels          │
+└─────────────────┴────────────────┴─────────────────┘
+
+*h = height of graph, w = maximum width
+
+For Our Project:
+    - DFS for reachability (Req 6)
+    - BFS for shortest path (Req 7)
+
+================================================================================
+6. MEMORY MANAGEMENT
+================================================================================
+
+6.1 MEMORY ALLOCATION POINTS
+─────────────────────────────
+
+ALLOCATION 1: DeptNode creation (in GetOrCreateDept)
+    DeptNode* newDept = new DeptNode;
+    
+    Allocates: sizeof(DeptNode) bytes
+        - char* name (8 bytes on 64-bit)
+        - DeptEdge* firstEdge (8 bytes)
+        - DeptNode* next (8 bytes)
+        - Total: 24 bytes per department
+
+ALLOCATION 2: Department name (in GetOrCreateDept)
+    newDept->name = CopyString(name);
+    
+    Inside CopyString:
+        char* dest = new char[len + 1];
+    
+    Allocates: (length of name + 1) bytes
+        - Example: "Cardiology" = 10 + 1 = 11 bytes
+        - Example: "Neurology" = 9 + 1 = 10 bytes
+
+ALLOCATION 3: DeptEdge creation (in AddReferral)
+    DeptEdge* newEdge = new DeptEdge;
+    
+    Allocates: sizeof(DeptEdge) bytes
+        - DeptNode* to (8 bytes)
+        - DeptEdge* next (8 bytes)
+        - Total: 16 bytes per referral
+
+TOTAL MEMORY USAGE:
+
+    For N departments with average name length L and E referrals:
+        Departments: N * (24 + L) bytes
+        Referrals: E * 16 bytes
+        Total: N * (24 + L) + E * 16 bytes
+
+    Example: 20 departments, average name 12 chars, 30 referrals
+        Departments: 20 * (24 + 12) = 720 bytes
+        Referrals: 30 * 16 = 480 bytes
+        Total: 1200 bytes = 1.2 KB
+
+Conclusion: Memory usage is minimal for hospital system
+
+6.2 MEMORY DEALLOCATION
+───────────────────────
+
+CURRENT STATE: No explicit deallocation
+
+    Problem:
+        - We never call 'delete' on departments or edges
+        - Memory leak accumulates
+    
+    Impact:
+        - For our project: MINIMAL
+        - Program runs once, terminates → OS reclaims all memory
+        - Typical run: allocate 1-2 KB, never free, program ends, OS frees
+    
+    Production System:
+        - Would need proper cleanup
+        - Add destructor or cleanup function
+
+PROPER CLEANUP (If Implemented):
+
+void CleanupGraph() {
+    DeptNode* curr = deptHead;
+    while (curr != nullptr) {
+        // Free edges first
+        DeptEdge* edge = curr->firstEdge;
+        while (edge != nullptr) {
+            DeptEdge* temp = edge;
+            edge = edge->next;
+            delete temp;
+        }
+        
+        // Free name
+        delete[] curr->name;
+        
+        // Free node
+        DeptNode* temp = curr;
+        curr = curr->next;
+        delete temp;
+    }
+    deptHead = nullptr;
+}
+
+Call at program exit:
+    int main() {
+        // ... build graph, run operations ...
+        CleanupGraph();
+        return 0;
+    }
+
+6.3 MEMORY SAFETY ISSUES
+─────────────────────────
+
+ISSUE 1: Dangling Pointers
+    
+    Scenario:
+        Delete a DeptNode while DeptEdges still point to it
+    
+    Example:
+        A → B → C
+        Delete B
+        A's edge still has pointer to B (now freed memory)
+        
+        If we access A's edge->to, we dereference freed memory
+        → UNDEFINED BEHAVIOR (crash, corruption, or seems to work)
+    
+    Solution:
+        - Don't allow node deletion (our approach)
+        - Or, delete all edges pointing to node first
+
+ISSUE 2: Memory Leaks
+    
+    Scenario:
+        Create nodes/edges, never free them
+    
+    Impact:
+        - Academic project: Negligible (program short-lived)
+        - Long-running system: Memory exhaustion
+    
+    Solution:
+        - Add cleanup function (as shown above)
+        - Or use smart pointers (C++11+, but overkill for this project)
+
+ISSUE 3: Double-Free
+    
+    Scenario:
+        Delete same pointer twice
+    
+    Example:
+        DeptNode* node = GetOrCreateDept("A");
+        delete node;
+        delete node;  // Undefined behavior!
+    
+    Solution:
+        - Set pointer to nullptr after delete
+        - Check if nullptr before delete
+
+6.4 OUR MEMORY MANAGEMENT STRATEGY
+───────────────────────────────────
+
+For this academic project, we:
+
+1. ALLOCATE freely during graph construction
+2. NEVER deallocate (rely on OS cleanup at program termination)
+3. ACCEPT memory "leak" (it's bounded and temporary)
+
+Justification:
+    ✓ Simpler code (no cleanup complexity)
+    ✓ No risk of use-after-free bugs
+    ✓ Program is short-lived (minutes, not hours)
+    ✓ Memory usage is tiny (< 10 KB)
+    ✓ OS reclaims all memory when program exits
+
+Production Considerations:
+    If this were a production system:
+        - Add CleanupGraph() function
+        - Call at program exit or when resetting graph
+        - Add error checking (null checks, allocation failures)
+        - Consider smart pointers or garbage collection
+
+================================================================================
+7. COMPLEXITY ANALYSIS
+================================================================================
+
+7.1 FUNCTION COMPLEXITIES
+─────────────────────────
+
+GetOrCreateDept(name):
+    Time: O(V) where V = number of departments
+        - Worst case: Traverse all V departments (not found or last)
+        - String comparison per node: O(L) where L = length of name
+        - Combined: O(V * L)
+    Space: O(1) auxiliary (no extra data structures)
+
+AddReferral(from, to):
+    Time: O(V)
+        - Two calls to GetOrCreateDept: 2 * O(V) = O(V)
+        - Edge insertion: O(1)
+        - Combined: O(V)
+    Space: O(1) auxiliary
+
+ListReachableDepartments(start):
+    Time: O(V + E) where E = number of referrals
+        - Find start: O(V)
+        - DFS traversal: O(V + E)
+        - IsVisited checks: O(V²) worst case (V calls * O(V) per call)
+        - Combined: O(V²) due to IsVisited, but typically closer to O(V + E)
+    Space: O(V) for visited array + recursion stack
+
+ShortestReferralPath(from, to):
+    Time: O(V + E)
+        - Find start/target: O(V)
+        - BFS traversal: O(V + E)
+        - IsVisited checks: Same as DFS, O(V²) worst case
+        - Path reconstruction: O(V) worst case
+        - Combined: O(V²) worst case, typically O(V + E)
+    Space: O(V) for queue + visited + parent map
+
+7.2 OPTIMIZATION OPPORTUNITIES
+───────────────────────────────
+
+OPTIMIZATION 1: Visited Tracking
+
+Current: Linear search O(V) per lookup
+    for (int i = 0; i < visitedCount; i++)
+        if (visited[i] == node) return true;
+
+Better: Hash set O(1) average per lookup
+    unordered_set<DeptNode*> visited;
+    if (visited.count(node)) return true;
+    
+    But: Requires STL, which project forbids
+
+Alternative: Visited flag in node
+    struct DeptNode {
+        bool visited;
+        // ...
+    };
+    if (node->visited) return true;
+    
+    Pros: O(1) lookup
+    Cons: Pollutes node structure, needs reset
+
+Our Choice: Linear search
+    Justification: V is small (~10-20), O(V) is fast enough
+
+OPTIMIZATION 2: Department Lookup
+
+Current: Linear search O(V)
+    while (curr != nullptr)
+        if (CompareString(curr->name, name) == 0)
+
+Better: Hash table O(1) average
+    unordered_map<string, DeptNode*> deptMap;
+    deptMap[name] = node;
+    
+    But: Requires STL
+
+Alternative: BST by name O(log V)
+    struct DeptNode {
+        char* name;
+        DeptNode* left;   // BST for name-based lookup
+        DeptNode* right;
+        DeptEdge* firstEdge;
+    };
+    
+    Pros: O(log V) lookup
+    Cons: More complex, mixing two tree structures
+
+Our Choice: Linear search
+    Justification: V is small, simplicity preferred
+
+OPTIMIZATION 3: Duplicate Edge Prevention
+
+Current: Allow duplicates (waste memory)
+    AddReferral("A", "B") twice → two edges
+
+Better: Check before adding
+    DeptEdge* edge = fromNode->firstEdge;
+    while (edge != nullptr) {
+        if (edge->to == toNode) return;  // Already exists
+        edge = edge->next;
+    }
+    
+    Cost: O(degree) per insertion
+    Benefit: No wasted memory, cleaner graph
+
+Our Choice: Allow duplicates
+    Justification: Unlikely in practice, simpler code
+
+7.3 COMPLEXITY COMPARISON: REPRESENTATIONS
+──────────────────────────────────────────
+
+┌─────────────────┬──────────────┬──────────────┐
+│ Operation       │ Adj. Matrix  │ Adj. List    │
+├─────────────────┼──────────────┼──────────────┤
+│ Space           │ O(V²)        │ O(V + E)     │
+│ Add Edge        │ O(1)         │ O(1)         │
+│ Remove Edge     │ O(1)         │ O(degree)    │
+│ Has Edge?       │ O(1)         │ O(degree)    │
+│ List Neighbors  │ O(V)         │ O(degree)    │
+│ DFS/BFS         │ O(V²)        │ O(V + E)     │
+└─────────────────┴──────────────┴──────────────┘
+
+For our graph (sparse: E << V²):
+    Adjacency List wins on space: O(V + E) << O(V²)
+    DFS/BFS faster: O(V + E) << O(V²)
+
+Trade-off:
+    Matrix faster for "Does edge A→B exist?" queries
+    But we rarely need that query
+
+7.4 REAL-WORLD PERFORMANCE
+──────────────────────────
+
+Typical Hospital System:
+    Departments (V): 20
+    Referrals (E): 30 (each dept refers to 1-2 others)
+
+GetOrCreateDept("Cardiology"):
+    O(V) = O(20) = ~20 comparisons
+    On modern CPU: < 1 microsecond
+
+AddReferral("A", "B"):
+    2 * GetOrCreateDept = ~40 comparisons
+    < 2 microseconds
+
+ListReachableDepartments("Cardiology"):
+    O(V + E) = O(20 + 30) = O(50)
+    Includes IsVisited calls: 50 * O(V) = 50 * 20 = 1000 operations
+    On modern CPU: < 10 microseconds
+
+ShortestReferralPath("A", "B"):
+    Similar to DFS: ~1000 operations
+    < 10 microseconds
+
+Conclusion: Performance is excellent for this problem size
+
+================================================================================
+8. TESTING STRATEGY
+================================================================================
+
+8.1 TEST CATEGORIES
+───────────────────
+
+CATEGORY 1: Basic Functionality
+    - Add referrals
+    - List reachable departments
+    - Find shortest path
+
+CATEGORY 2: Edge Cases
+    - Empty graph
+    - Single node
+    - Non-existent departments
+    - Self-referral
+    - Disconnected components
+
+CATEGORY 3: Graph Structures
+    - Linear chain: A → B → C → D
+    - Star: A → B, A → C, A → D (all from center)
+    - Cycle: A → B → C → A
+    - Multiple paths: A → B → D, A → C → D
+
+CATEGORY 4: Boundary Conditions
+    - No outgoing edges (sink node)
+    - No incoming edges (source node)
+    - Many edges from one node
+    - Deep path (long chain)
+
+8.2 TEST CASES
+──────────────
+
+TEST 1: Basic Reachability
+    Graph: Cardiology → Neurology → Radiology
+    Query: ListReachableDepartments("Cardiology")
+    Expected: Neurology, Radiology
+
+TEST 2: No Reachable Departments
+    Graph: Radiology (no edges)
+    Query: ListReachableDepartments("Radiology")
+    Expected: "(No reachable departments)"
+
+TEST 3: Shortest Path (Direct)
+    Graph: Cardiology → Radiology
+    Query: ShortestReferralPath("Cardiology", "Radiology")
+    Expected: Length 1, Path: Cardiology → Radiology
+
+TEST 4: Shortest Path (Indirect)
+    Graph: Cardiology → Neurology → Radiology
+    Query: ShortestReferralPath("Cardiology", "Radiology")
+    Expected: Length 2, Path: Cardiology → Neurology → Radiology
+
+TEST 5: Multiple Paths (Shortest Wins)
+    Graph: Cardiology → Radiology (direct)
+           Cardiology → Neurology → Radiology (indirect)
+    Query: ShortestReferralPath("Cardiology", "Radiology")
+    Expected: Length 1, Path: Cardiology → Radiology
+
+TEST 6: No Path Exists
+    Graph: Cardiology → Neurology
+           Radiology (disconnected)
+    Query: ShortestReferralPath("Cardiology", "Radiology")
+    Expected: "No referral path exists"
+
+TEST 7: Cycle Handling
+    Graph: A → B → C → A (cycle)
+    Query: ListReachableDepartments("A")
+    Expected: B, C (should not loop infinitely)
+
+TEST 8: Self-Referral
+    Graph: Cardiology → Cardiology (self-loop)
+    Query: ListReachableDepartments("Cardiology")
+    Expected: Cardiology (itself is reachable)
+
+TEST 9: Non-Existent Department
+    Graph: Cardiology → Neurology
+    Query: ListReachableDepartments("Dermatology")
+    Expected: "Department 'Dermatology' not found"
+
+TEST 10: Complex Graph
+    Graph:
+        Cardiology → Neurology → Radiology → Surgery
+        Cardiology → Orthopedics → Surgery
+    Query: ShortestReferralPath("Cardiology", "Surgery")
+    Expected: Length 2, Path: Cardiology → Orthopedics → Surgery
+
+8.3 TEST EXECUTION
+──────────────────
+
+Add to main.cpp:
+
+    cout << "\n========== GRAPH TESTS ==========\n";
+    
+    // Build graph
+    AddReferral("Cardiology", "Neurology");
+    AddReferral("Neurology", "Radiology");
+    AddReferral("Cardiology", "Radiology");
+    AddReferral("Orthopedics", "Neurology");
+    AddReferral("Radiology", "Surgery");
+    
+    // Test 1
+    cout << "\n--- Test 1: Reachable from Cardiology ---\n";
+    ListReachableDepartments("Cardiology");
+    // Expected: Neurology, Radiology, Surgery
+    
+    // Test 2
+    cout << "\n--- Test 2: Shortest path Cardiology → Surgery ---\n";
+    int dist = ShortestReferralPath("Cardiology", "Surgery");
+    // Expected: Length 2 (Cardiology → Radiology → Surgery)
+    
+    // Test 3
+    cout << "\n--- Test 3: No path (Surgery → Cardiology) ---\n";
+    dist = ShortestReferralPath("Surgery", "Cardiology");
+    // Expected: No path exists
+    
+    // Test 4
+    cout << "\n--- Test 4: Non-existent department ---\n";
+    ListReachableDepartments("Dermatology");
+    // Expected: Department not found
+
+8.4 VERIFICATION CHECKLIST
+───────────────────────────
+
+For Each Test:
+    ☐ Correct output produced?
+    ☐ No crashes or errors?
+    ☐ Expected departments listed?
+    ☐ Path length correct?
+    ☐ Path sequence correct?
+    ☐ Error messages appropriate?
+
+Performance:
+    ☐ Tests complete quickly (< 1 second)?
+    ☐ No infinite loops?
+    ☐ Memory usage reasonable?
+
+Edge Cases:
+    ☐ Empty graph handled?
+    ☐ Non-existent department handled?
+    ☐ Cycles don't cause infinite loops?
+    ☐ No path situation handled?
+
+================================================================================
+9. VIVA DEFENSE POINTS
+================================================================================
+
+9.1 FUNDAMENTAL QUESTIONS
+─────────────────────────
+
+Q1: "What is a directed graph?"
+
+A: "A directed graph is a set of nodes (vertices) connected by one-way edges.
+    In our hospital system, nodes represent departments and edges represent
+    referral relationships. If Cardiology can refer patients to Neurology,
+    there's a directed edge Cardiology → Neurology. Unlike undirected graphs,
+    this doesn't automatically mean Neurology can refer back to Cardiology."
+
+Q2: "Why use adjacency list instead of adjacency matrix?"
+
+A: "Our referral graph is sparse—each department refers to only 1-2 others,
+    but there are 20 departments. An adjacency matrix would be 20×20 = 400
+    cells, mostly zeros. That's O(V²) space. An adjacency list only stores
+    actual edges, using O(V + E) space. Since E << V², the list is much more
+    space-efficient. Additionally, iterating over neighbors is faster: O(degree)
+    vs O(V) for matrices."
+
+Q3: "Explain DFS vs BFS."
+
+A: "DFS (Depth-First Search) explores as deep as possible before backtracking.
+    It uses a stack (or recursion). BFS (Breadth-First Search) explores level
+    by level, visiting all neighbors before moving deeper. It uses a queue.
+    
+    I use DFS for reachability because I only care WHETHER a department is
+    reachable, not the shortest path. DFS is simpler to code recursively.
+    
+    I use BFS for shortest path because BFS explores level by level, so the
+    first time it reaches the target, it's via the shortest path. This is
+    guaranteed in unweighted graphs."
+
+Q4: "How do you avoid infinite loops in cycles?"
+
+A: "I maintain a 'visited' array that tracks which departments have been
+    explored. Before recursing into a neighbor, I check if it's already visited.
+    If yes, I skip it. This breaks cycles.
+    
+    Example: If A → B → C → A, when I'm at C and see edge back to A, I check
+    visited[A] and find it's true, so I don't recurse. The cycle is broken."
+
+Q5: "What's the time complexity of your BFS?"
+
+A: "O(V + E) where V is departments and E is referrals. Here's why:
+    - Each department is enqueued and dequeued once: O(V)
+    - Each edge is examined once when we explore its source: O(E)
+    - Combined: O(V + E)
+    
+    Note: My IsVisited function adds overhead, making it O(V²) worst case, but
+    for our small graph (V=20), this is negligible."
+
+9.2 DESIGN DECISION QUESTIONS
+──────────────────────────────
+
+Q6: "Why insert edges at the front of adjacency lists?"
+
+A: "O(1) insertion. If I inserted at the end, I'd need to traverse to the tail,
+    making it O(degree). Since traversal order doesn't matter for DFS or BFS—
+    both explore all neighbors anyway—there's no benefit to maintaining a
+    specific order. Front insertion is faster and simpler."
+
+Q7: "Why do you allow duplicate edges?"
+
+A: "Simplicity. Checking for duplicates would require traversing the adjacency
+    list before insertion, adding O(degree) time. In practice, duplicates are
+    unlikely (we don't call AddReferral("A", "B") twice). Even if duplicates
+    exist, DFS/BFS still work correctly—they'll just check the same neighbor
+    multiple times, which the visited check prevents from causing issues."
+
+Q8: "Why use GetOrCreateDept in AddReferral?"
+
+A: "Convenience and atomicity. Users can call AddReferral("A", "B") without
+    worrying about whether A or B exist yet. The function handles department
+    creation automatically. This makes the API cleaner and less error-prone.
+    The alternative would require:
+        CreateDepartment("A");
+        CreateDepartment("B");
+        AddReferral("A", "B");
+    which is more verbose and easy to forget."
+
+Q9: "How would you optimize IsVisited?"
+
+A: "Three options:
+    1. Hash set (if STL allowed): O(1) lookup average case
+    2. Visited flag in DeptNode: O(1) but pollutes structure
+    3. Sort visited array and binary search: O(log V) lookup, O(V log V) sort
+    
+    For this project, V=20, so O(V) linear search is fast enough (<1 microsecond).
+    The simplicity of linear search outweighs the minor performance gain from
+    optimization."
+
+9.3 ALGORITHM QUESTIONS
+───────────────────────
+
+Q10: "Walk me through how BFS finds the shortest path."
+
+A: [Draw on whiteboard]
+
+"Graph: A → B → D
+        A → C → D
+
+BFS(A to D):
+
+Level 0: Start with A
+    Queue: [A]
+    Visit A, explore neighbors B and C
+
+Level 1: Process B and C
+    Queue: [B, C] → [C]
+    Visit B, explore neighbor D
+    Queue: [C, D]
+    
+    We found D! Distance = 2 (level 1 + 1 edge)
+
+To reconstruct path:
+    parent[D] = B
+    parent[B] = A
+    Backtrack: D → B → A
+    Reverse: A → B → D
+
+If we continued BFS:
+    Queue: [C, D] → [D]
+    Visit C, also explores D
+    But D already visited, so we skip
+    
+This shows BFS found D via the shorter path (A→B→D, length 2) before
+considering the longer path (A→C→D, length 3)."
+
+Q11: "What's the difference between your visited array and parent map?"
+
+A: "Both track nodes, but for different purposes:
+
+Visited array:
+    - Tracks: Has this node been DISCOVERED?
+    - Used by: DFS and BFS
+    - Purpose: Prevent revisiting (avoid cycles, duplicate work)
+    - Example: visited = [A, B, C] means we've discovered A, B, C
+
+Parent map:
+    - Tracks: How did we REACH this node?
+    - Used by: BFS (for path reconstruction)
+    - Purpose: Remember the path taken
+    - Example: parent[C] = B means we reached C from B
+
+In BFS, I need both:
+    - Visited: to avoid processing C twice
+    - Parent: to remember C was reached from B (for path reconstruction)"
+
+Q12: "Could you use DFS for shortest path?"
+
+A: "DFS CAN find A path, but not necessarily the SHORTEST path.
+
+Example:
+    A → B → D
+    A → C → D
+
+DFS might explore A → C → D first (length 2).
+Then when it explores A → B → D, it finds D is already visited, so it doesn't
+realize there's also a path of length 2.
+
+Wait, both are length 2 here. Better example:
+
+    A → B → E
+    A → C → D → E
+
+DFS might explore A → C → D → E (length 3) first.
+When it tries A → B → E, E is already visited, so it stops.
+Result: Found path of length 3, missed shorter path of length 2.
+
+BFS would explore:
+    Level 0: A
+    Level 1: B, C
+    Level 2: E (via B), D
+    Found E at level 2, distance 2.
+
+BFS is guaranteed to find E via the shortest path because it explores level
+by level."
+
+9.4 IMPLEMENTATION QUESTIONS
+────────────────────────────
+
+Q13: "Why do you use CompareString instead of strcmp?"
+
+A: "Project requirements forbid using <cstring>. Our Utils.cpp provides
+    CompareString, which implements the same functionality: returns 0 if strings
+    are equal, negative if first is less, positive if first is greater. It
+    manually compares characters one by one:
+    
+        while (a[i] && b[i]) {
+            if (a[i] != b[i]) return a[i] - b[i];
+            i++;
+        }
+    
+    This avoids library dependencies while maintaining the same semantic."
+
+Q14: "Explain your Queue implementation."
+
+A: "Simple array-based queue using two indices:
+    - front: points to next element to dequeue
+    - back: points to next free slot for enqueue
+    
+    enqueue(node): nodes[back++] = node;
+    dequeue(): return nodes[front++];
+    isEmpty(): return front >= back;
+    
+    This is a 'sliding window' approach. Elements aren't removed from the array,
+    we just move the front pointer. The array 'fills up' left to right.
+    
+    Limitation: Fixed size (100 nodes). If graph is larger, would need dynamic
+    resizing or circular buffer. For our 20-department system, 100 is plenty."
+
+Q15: "Why is your graph stored globally (deptHead)?"
+
+A: "Simplicity. All functions need access to the department list. Options:
+    1. Global variable (our choice): All functions access deptHead directly
+    2. Pass as parameter: Every function takes DeptNode** root parameter
+    3. Encapsulate in struct/class: More object-oriented
+    
+    For this C-style project, a global variable is the simplest. In larger
+    systems, I'd prefer encapsulation, but for 20 departments and 4 functions,
+    global is acceptable and reduces parameter passing."
+
+9.5 COMPLEXITY QUESTIONS
+────────────────────────
+
+Q16: "What's the space complexity of your DFS?"
+
+A: "O(V) for two reasons:
+    1. Visited array: stores up to V department pointers
+    2. Recursion stack: in worst case (linear chain), stack depth is V
+    
+    Combined: O(V) + O(V) = O(V).
+    
+    If graph is balanced (like a binary tree), recursion depth would be O(log V),
+    but worst case is O(V)."
+
+Q17: "How would your algorithm perform on a graph with 10,000 nodes?"
+
+A: "Poorly, due to IsVisited being O(V):
+    - DFS calls IsVisited: O(V + E) times
+    - Each IsVisited call: O(V)
+    - Total: O(V * (V + E)) = O(V²) since V >> E typically
+    
+    For V=10,000:
+        IsVisited: 10,000 comparisons
+        Called: ~10,000 times
+        Total: 100 million operations
+        On modern CPU: ~1 second (slow but workable)
+    
+    Better approach for large graphs: Hash set for O(1) visited checks.
+    
+    However, hospital graphs are small (V<100), so my implementation is
+    perfectly adequate."
+
+Q18: "What if you had a weighted graph (referral times)?"
+
+A: "BFS wouldn't work for shortest path. BFS only works for UNWEIGHTED graphs.
+    
+    For weighted graphs, I'd need Dijkstra's algorithm:
+    - Use priority queue instead of regular queue
+    - Track distances, not just visited
+    - Always process closest unvisited node next
+    - Time complexity: O((V + E) log V) with binary heap
+    
+    Example:
+        A → B (time=5)
+        A → C (time=2)
+        C → B (time=1)
+    
+    BFS would find A→B (one edge)
+    But shortest time is A→C→B (total time=3)
+    
+    Dijkstra's would correctly find A→C→B."
+
+9.6 PRACTICAL QUESTIONS
+───────────────────────
+
+Q19: "How would you load referrals from a file?"
+
+A: "Similar to loading doctors/patients. File format:
+    Cardiology|Neurology
+    Neurology|Radiology
+    ...
+    
+    Algorithm:
+        Open file
+        While not EOF:
+            Read line
+            Parse: split on '|' to get 'from' and 'to'
+            AddReferral(from, to)
+        Close file
+    
+    Code sketch:
+        ifstream file("referrals.txt");
+        char line[256], from[100], to[100];
+        while (file.getline(line, 256)) {
+            // Parse line into from and to
+            int i = 0, j = 0;
+            while (line[i] != '|') from[j++] = line[i++];
+            from[j] = '\0';
+            i++; // skip '|'
+            j = 0;
+            while (line[i]) to[j++] = line[i++];
+            to[j] = '\0';
+            
+            AddReferral(from, to);
+        }
+        file.close();
+    
+    This would be similar to LoadDoctorsFromFile."
+
+Q20: "How would you visualize the graph?"
+
+A: "Text-based visualization:
+    
+    Print all departments and their referrals:
+        Cardiology → Neurology, Radiology
+        Neurology → Radiology
+        Radiology → Surgery
+        Orthopedics → Neurology
+    
+    Code:
+        void PrintGraph() {
+            DeptNode* dept = deptHead;
+            while (dept != nullptr) {
+                cout << dept->name << " → ";
+                DeptEdge* edge = dept->firstEdge;
+                if (edge == nullptr) {
+                    cout << "(none)";
+                } else {
+                    while (edge != nullptr) {
+                        cout << edge->to->name;
+                        if (edge->next != nullptr) cout << ", ";
+                        edge = edge->next;
+                    }
+                }
+                cout << "\n";
+                dept = dept->next;
+            }
+        }
+    
+    For graphical visualization, would export to Graphviz DOT format or use a
+    graph drawing library."
+
+================================================================================
+10. COMMON PITFALLS & SOLUTIONS
+================================================================================
+
+10.1 INFINITE LOOPS
+───────────────────
+
+PITFALL: Forgetting to mark nodes as visited in DFS/BFS
+
+Symptom:
+    Program hangs
+    Stack overflow (recursive DFS)
+    Infinite output
+
+Example:
+    Graph: A → B → A (cycle)
+    
+    Without visited tracking:
+        DFS(A) → DFS(B) → DFS(A) → DFS(B) → ...
+
+Solution:
+    ALWAYS mark nodes visited before recursing
+    Check visited status before exploring
+
+10.2 MEMORY LEAKS
+─────────────────
+
+PITFALL: Creating edges/nodes without freeing
+
+Symptom:
+    Memory usage grows
+    (Not noticeable in short programs)
+
+Example:
+    AddReferral called 1000 times
+    Each creates DeptEdge (16 bytes)
+    Total: 16 KB leaked
+
+Solution:
+    For academic project: Acceptable (OS cleans up)
+    For production: Implement cleanup function
+
+10.3 DANGLING POINTERS
+──────────────────────
+
+PITFALL: Deleting a node while edges still point to it
+
+Symptom:
+    Crashes
+    Segmentation faults
+    Undefined behavior
+
+Example:
+    A → B → C
+    Delete B
+    Traverse from A:
+        edge->to points to freed memory
+
+Solution:
+    Don't delete nodes (our approach)
+    OR: Delete all incoming edges first (complex)
+
+10.4 OFF-BY-ONE ERRORS
+──────────────────────
+
+PITFALL: Path length vs number of nodes
+
+Example:
+    Path: A → B → C
+    Number of nodes: 3
+    Number of edges (path length): 2
+    
+    Common mistake: return 3 instead of 2
+
+Solution:
+    Path length = pathLength - 1
+    Always test with simple examples
+
+10.5 QUEUE OVERFLOW
+───────────────────
+
+PITFALL: Fixed-size queue in BFS
+
+Symptom:
+    Writing past array bounds
+    Crashes or corruption
+
+Example:
+    Graph with 200 nodes
+    Queue size: 100
+    Enqueue 200 nodes → overflow
+
+Solution:
+    Use large enough queue for your graph
+    Our queue[100] is safe for V=20
+
+10.6 FORGETTING NULLPTR CHECKS
+──────────────────────────────
+
+PITFALL: Dereferencing without checking
+
+Example:
+    DeptNode* dept = deptHead;
+    cout << dept->name;  // CRASH if deptHead is nullptr
+
+Solution:
+    if (dept != nullptr)
+        cout << dept->name;
+    
+    Always check before dereference
+
+10.7 STRING COMPARISON ERRORS
+─────────────────────────────
+
+PITFALL: Using == instead of strcmp/CompareString
+
+Example:
+    if (dept->name == "Cardiology")  // WRONG: compares pointers
+    
+    Correct:
+    if (CompareString(dept->name, "Cardiology") == 0)
+
+Solution:
+    Never use == for C-strings
+    Always use string comparison function
+
+10.8 SHALLOW COPY OF NAMES
+──────────────────────────
+
+PITFALL: Storing pointer instead of copying string
+
+Example:
+    newDept->name = name;  // WRONG: just copies pointer
+    
+    Problem:
+        If 'name' is temporary, it gets destroyed
+        newDept->name now points to freed/invalid memory
+
+Solution:
+    newDept->name = CopyString(name);  // CORRECT: deep copy
+
+10.9 FORGETTING PARENT TRACKING IN BFS
+──────────────────────────────────────
+
+PITFALL: Not storing parent pointers
+
+Symptom:
+    Can find shortest distance, but can't reconstruct path
+
+Example:
+    Found target at distance 3, but don't know the path
+
+Solution:
+    Always use ParentMap to track how you reached each node
+
+10.10 MIXING UP NEXT POINTERS
+─────────────────────────────
+
+PITFALL: Confusing DeptNode->next and DeptEdge->next
+
+Example:
+    DeptNode* curr = deptHead;
+    while (curr != nullptr) {
+        curr = curr->firstEdge->next;  // WRONG: skips to next edge, not node
+    }
+    
+    Correct:
+    while (curr != nullptr) {
+        curr = curr->next;  // Traverse department list
+
+Solution:
+    Clear naming: node->next vs edge->next
+    Comments to clarify which list you're traversing
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+
+This explanation document covers every aspect of the graph implementation:
+- Fundamental concepts
+- Data structure design
+- Algorithm explanations
+- Memory management
+- Complexity analysis
+- Testing strategies
+- Viva defense preparation
+- Common mistakes
+
+You are now equipped to:
+✓ Implement the code confidently
+✓ Understand every design decision
+✓ Explain to evaluators why you made these choices
+✓ Debug any issues that arise
+✓ Answer any viva questions with authority
+
+Total understanding achieved: COMPLETE
+Ready for implementation: YES
+Ready for viva defense: YES
+
+================================================================================

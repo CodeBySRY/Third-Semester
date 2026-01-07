@@ -1,0 +1,820 @@
+================================================================================
+        AVL TREE WITH REBALANCING COUNTER - COMPLETE EXPLANATION
+================================================================================
+
+TABLE OF CONTENTS:
+------------------
+1. Introduction to AVL Trees
+2. Understanding Balance Factor
+3. The Rebalancing Problem Statement
+4. Why Your Original Code Had Issues
+5. The Correct Solution Explained
+6. Step-by-Step Trace of Input (9, 4, 5, 10, 20)
+7. Understanding Why Node 5 Stays Balanced
+8. Code Implementation with Detailed Comments
+9. Testing and Validation
+10. Key Takeaways
+
+================================================================================
+1. INTRODUCTION TO AVL TREES
+================================================================================
+
+An AVL Tree is a self-balancing Binary Search Tree (BST) where the heights of 
+the left and right subtrees of any node differ by at most 1.
+
+Properties:
+-----------
+- Follows BST property: left < root < right
+- After every insertion/deletion, checks balance and rebalances if needed
+- Guarantees O(log n) time for search, insert, and delete operations
+- Uses rotations to maintain balance
+
+Why AVL Trees?
+--------------
+Regular BSTs can become skewed (like a linked list) in worst case, giving 
+O(n) operations. AVL trees prevent this by maintaining balance.
+
+Example of skewed BST (inserting 1, 2, 3, 4, 5 in order):
+    1
+     \
+      2
+       \
+        3
+         \
+          4
+           \
+            5
+
+This is essentially a linked list with O(n) search time!
+
+AVL tree for same input maintains balance:
+       2
+      / \
+     1   4
+        / \
+       3   5
+
+Search time: O(log n)
+
+================================================================================
+2. UNDERSTANDING BALANCE FACTOR
+================================================================================
+
+Balance Factor (BF) of a node = Height(Left Subtree) - Height(Right Subtree)
+
+Height Calculation:
+-------------------
+- NULL node has height = -1
+- Leaf node has height = 0
+- Internal node height = max(left child height, right child height) + 1
+
+Balance Factor Interpretation:
+-------------------------------
+BF = 0   : Perfectly balanced (both subtrees have equal height)
+BF = 1   : Left subtree is 1 level taller (BALANCED - acceptable)
+BF = -1  : Right subtree is 1 level taller (BALANCED - acceptable)
+BF = 2   : Left subtree is 2 levels taller (UNBALANCED - needs rebalancing)
+BF = -2  : Right subtree is 2 levels taller (UNBALANCED - needs rebalancing)
+
+CRITICAL RULE: A node is BALANCED if |BF| <= 1
+               A node is UNBALANCED if |BF| > 1
+
+Example:
+--------
+        10 (BF = 1)
+       /  \
+      5    15
+     /
+    3
+
+Node 10: Left height = 1, Right height = 0, BF = 1 - 0 = 1 (BALANCED)
+Node 5: Left height = 0, Right height = -1, BF = 0 - (-1) = 1 (BALANCED)
+Node 15: Left height = -1, Right height = -1, BF = -1 - (-1) = 0 (BALANCED)
+
+================================================================================
+3. THE REBALANCING PROBLEM STATEMENT
+================================================================================
+
+Task: Implement an AVL Tree where each node tracks how many times it became 
+      UNBALANCED during insertions.
+
+Requirements:
+-------------
+1. For every node, maintain a counter called "rebalanceCount"
+2. Increment the counter ONLY when that specific node's balance factor 
+   becomes greater than 1 or less than -1 (i.e., |BF| > 1)
+3. After incrementing, perform appropriate rotations to rebalance the tree
+4. Display the rebalance count for all nodes at the end
+
+Key Understanding:
+------------------
+- We count HOW MANY TIMES a node became unbalanced
+- NOT how many times the tree was rebalanced overall
+- NOT how many times rotations were performed
+- ONLY when THAT SPECIFIC node's |BF| > 1
+
+================================================================================
+4. WHY YOUR ORIGINAL CODE HAD ISSUES
+================================================================================
+
+Original Code Logic:
+--------------------
+Your code was checking the balance factor and incrementing the counter, but 
+the timing and logic had subtle issues. The code was incrementing counters 
+for nodes that were checking their balance, but not necessarily the ones that 
+were actually unbalanced.
+
+The Problem:
+------------
+The rebalance counter was being incremented based on conditions that didn't 
+precisely match "this node is unbalanced". The logic needed to be:
+
+1. Update the node's height
+2. Calculate balance factor
+3. IF |balance factor| > 1, THEN increment counter for THIS node
+4. THEN perform rotations if needed
+
+The fix ensures we increment the counter at the exact moment when we detect 
+that THIS specific node has become unbalanced.
+
+================================================================================
+5. THE CORRECT SOLUTION EXPLAINED
+================================================================================
+
+Core Algorithm:
+---------------
+1. Insert node using standard BST insertion (recursively)
+2. On the way BACK UP from recursion:
+   a. Update height of current node
+   b. Calculate balance factor
+   c. Check if |BF| > 1
+      - If YES: Increment rebalance counter for THIS node
+      - Then perform appropriate rotation(s)
+   d. Return the (possibly new) root of this subtree
+
+Rotation Types:
+---------------
+There are 4 cases of imbalance:
+
+1. Left-Left (LL): Node is left-heavy AND left child is left-heavy
+   Solution: Single RIGHT rotation
+
+2. Left-Right (LR): Node is left-heavy BUT left child is right-heavy
+   Solution: LEFT rotation on left child, then RIGHT rotation on node
+
+3. Right-Right (RR): Node is right-heavy AND right child is right-heavy
+   Solution: Single LEFT rotation
+
+4. Right-Left (RL): Node is right-heavy BUT right child is left-heavy
+   Solution: RIGHT rotation on right child, then LEFT rotation on node
+
+Visual Example of Rotations:
+-----------------------------
+
+LEFT ROTATION (for RR case):
+Before:                After:
+    x                    y
+     \                  / \
+      y                x   C
+       \
+        C
+
+RIGHT ROTATION (for LL case):
+Before:                After:
+      y                  x
+     /                  / \
+    x                  A   y
+   /
+  A
+
+================================================================================
+6. STEP-BY-STEP TRACE OF INPUT (9, 4, 5, 10, 20)
+================================================================================
+
+INSERTION 1: Insert 9
+---------------------
+Tree:
+    9 (BF=0, h=0)
+
+Analysis: Single node, perfectly balanced
+Rebalance Counters: {9: 0}
+
+================================================================================
+
+INSERTION 2: Insert 4
+---------------------
+Tree Before Balancing:
+    9 (BF=?, h=?)
+   /
+  4 (BF=0, h=0)
+
+Balancing Process:
+- Start at node 4: BF = 0 (balanced)
+- Move up to node 9: 
+  * Left height = 0, Right height = -1
+  * BF = 0 - (-1) = 1 (balanced, no action needed)
+
+Tree After:
+    9 (BF=1, h=1)
+   /
+  4 (BF=0, h=0)
+
+Rebalance Counters: {9: 0, 4: 0}
+
+================================================================================
+
+INSERTION 3: Insert 5
+---------------------
+Tree Before Balancing:
+    9 (BF=?, h=?)
+   /
+  4 (BF=?, h=?)
+   \
+    5 (BF=0, h=0)
+
+Balancing Process:
+- Start at node 5: BF = 0 (balanced)
+- Move up to node 4:
+  * Left height = -1, Right height = 0
+  * BF = -1 - 0 = -1 (balanced, no action needed)
+- Move up to node 9:
+  * Left height = 1, Right height = -1
+  * BF = 1 - (-1) = 2 (UNBALANCED!)
+  * Node 9's counter increments: 9: 0 -> 1
+  * This is a LEFT-RIGHT case (left-heavy but left child is right-heavy)
+  * Solution: Left rotation on 4, then Right rotation on 9
+
+After LEFT rotation on 4:
+    9
+   /
+  5
+ /
+4
+
+After RIGHT rotation on 9:
+    5 (BF=0, h=1)
+   / \
+  4   9 (BF=0, h=0 each)
+
+Rebalance Counters: {9: 1, 4: 0, 5: 0}
+
+================================================================================
+
+INSERTION 4: Insert 10
+----------------------
+Tree Before Balancing:
+    5 (BF=?, h=?)
+   / \
+  4   9 (BF=?, h=?)
+       \
+       10 (BF=0, h=0)
+
+Balancing Process:
+- Start at node 10: BF = 0 (balanced)
+- Move up to node 9:
+  * Left height = -1, Right height = 0
+  * BF = -1 - 0 = -1 (balanced, no action)
+- Move up to node 5:
+  * Left height = 0, Right height = 1
+  * BF = 0 - 1 = -1 (balanced, no action)
+
+Tree After:
+    5 (BF=-1, h=2)
+   / \
+  4   9 (BF=-1, h=1)
+       \
+       10 (BF=0, h=0)
+
+Rebalance Counters: {9: 1, 4: 0, 5: 0, 10: 0}
+
+================================================================================
+
+INSERTION 5: Insert 20
+----------------------
+Tree Before Balancing:
+    5 (BF=?, h=?)
+   / \
+  4   9 (BF=?, h=?)
+       \
+       10 (BF=?, h=?)
+         \
+         20 (BF=0, h=0)
+
+Balancing Process:
+- Start at node 20: BF = 0 (balanced)
+- Move up to node 10:
+  * Left height = -1, Right height = 0
+  * BF = -1 - 0 = -1 (balanced, no action)
+- Move up to node 9:
+  * Left height = -1, Right height = 1
+  * BF = -1 - 1 = -2 (UNBALANCED!)
+  * Node 9's counter increments: 9: 1 -> 2
+  * This is a RIGHT-RIGHT case (right-heavy and right child is right-heavy)
+  * Solution: Left rotation on 9
+
+After LEFT rotation on 9:
+    5
+   / \
+  4   10
+     /  \
+    9   20
+
+Now continue balancing up to node 5:
+- Node 5:
+  * Left height = 0, Right height = 1
+  * BF = 0 - 1 = -1 (balanced, no action needed)
+
+Tree After:
+    5 (BF=-1, h=2)
+   / \
+  4   10 (BF=0, h=1)
+     /  \
+    9   20 (BF=0, h=0 each)
+
+Final Rebalance Counters: {9: 2, 4: 0, 5: 0, 10: 0, 20: 0}
+
+================================================================================
+7. UNDERSTANDING WHY NODE 5 STAYS BALANCED
+================================================================================
+
+This is the CRITICAL question you asked!
+
+When we insert 20, here's what happens:
+
+BEFORE rotation at node 9:
+    5 (h=2)
+   / \
+  4   9 (h=2, BF=-2) <- UNBALANCED
+       \
+       10 (h=1)
+         \
+         20 (h=0)
+
+Node 5's balance factor would be calculated as:
+- Left height (node 4) = 0
+- Right height (node 9's subtree) = 2
+- BF = 0 - 2 = -2 (This WOULD make it unbalanced!)
+
+BUT: The rotation happens at node 9 BEFORE we check node 5!
+
+AFTER rotation at node 9:
+    5 (h=2)
+   / \
+  4   10 (h=1)
+     /  \
+    9   20
+
+Now when we check node 5:
+- Left height (node 4) = 0
+- Right height (node 10's subtree) = 1
+- BF = 0 - 1 = -1 (BALANCED!)
+
+KEY INSIGHT:
+------------
+The AVL algorithm processes nodes BOTTOM-UP during the recursive backtracking.
+When we detect an imbalance at a LOWER node and fix it with rotation, that 
+rotation PREVENTS the imbalance from propagating to HIGHER nodes.
+
+This is why:
+- Node 9 detects imbalance (BF = -2) and rotates
+- The rotation fixes the local structure
+- By the time we check node 5, the subtree is already balanced
+- Node 5 never sees an imbalanced state, so its counter doesn't increment
+
+This is the BEAUTY of AVL trees: local rotations prevent cascading imbalances!
+
+Think of it like this:
+- Imagine a tower of blocks getting too tall on one side
+- You fix the bottom part by rearranging blocks
+- The top part automatically becomes stable because the base is now solid
+- You don't need to fix both the bottom AND the top separately
+
+================================================================================
+8. CODE IMPLEMENTATION WITH DETAILED COMMENTS
+================================================================================
+
+Below is the complete, corrected code:
+
+---START OF CODE---
+
+#include <iostream>
+using namespace std;
+
+// AVL Tree Node structure
+struct AVLNode {
+    int data;           // Value stored in node
+    int height;         // Height of node (for balance calculation)
+    int rebalanceCount; // Counter for rebalancing activities
+    AVLNode* left;      // Pointer to left child
+    AVLNode* right;     // Pointer to right child
+    
+    // Constructor to initialize node
+    AVLNode(int value) {
+        data = value;
+        height = 0;     // New node has height 0 (leaf)
+        rebalanceCount = 0;
+        left = right = NULL;
+    }
+};
+
+// AVL Tree Class
+class AVLTree {
+private:
+    AVLNode* root;      // Root of the AVL tree
+    
+    // Helper: Get height of a node (handles null case)
+    // Returns -1 for NULL nodes (standard AVL convention)
+    int getHeight(AVLNode* node) {
+        if (node == NULL) {
+            return -1;  // Empty node has height -1
+        } else {
+            return node->height;
+        }
+    }
+    
+    // Helper: Calculate balance factor (height difference between subtrees)
+    // Balance Factor = Height(Left) - Height(Right)
+    // Positive = left heavy, Negative = right heavy, Zero = balanced
+    int getBalanceFactor(AVLNode* node) {
+        if (node == NULL) return 0;
+        return getHeight(node->left) - getHeight(node->right);
+    }
+    
+    // Helper: Update height based on children's heights
+    // Height = max(left child height, right child height) + 1
+    void updateHeight(AVLNode* node) {
+        if (node == NULL) return;
+        
+        int leftHeight = getHeight(node->left);
+        int rightHeight = getHeight(node->right);
+        
+        // Height is max of children's heights + 1
+        if (leftHeight > rightHeight) {
+            node->height = leftHeight + 1;
+        } else {
+            node->height = rightHeight + 1;
+        }
+    }
+    
+    // Right Rotation (for left-left imbalance)
+    // Used when a node is left-heavy and its left child is also left-heavy
+    //
+    // Before:       After:
+    //     y           x
+    //    / \         / \
+    //   x   C  =>   A   y
+    //  / \             / \
+    // A   B           B   C
+    //
+    AVLNode* rotateRight(AVLNode* y) {
+        AVLNode* x = y->left;
+        AVLNode* T2 = x->right;
+        
+        // Perform rotation
+        x->right = y;
+        y->left = T2;
+        
+        // Update heights after rotation
+        // IMPORTANT: Update y first (now child), then x (now parent)
+        updateHeight(y);
+        updateHeight(x);
+        
+        return x; // New root after rotation
+    }
+    
+    // Left Rotation (for right-right imbalance)
+    // Used when a node is right-heavy and its right child is also right-heavy
+    //
+    // Before:       After:
+    //   x             y
+    //  / \           / \
+    // A   y    =>   x   C
+    //    / \       / \
+    //   B   C     A   B
+    //
+    AVLNode* rotateLeft(AVLNode* x) {
+        AVLNode* y = x->right;
+        AVLNode* T2 = y->left;
+        
+        // Perform rotation
+        y->left = x;
+        x->right = T2;
+        
+        // Update heights after rotation
+        // IMPORTANT: Update x first (now child), then y (now parent)
+        updateHeight(x);
+        updateHeight(y);
+        
+        return y; // New root after rotation
+    }
+    
+    // Balance the tree and increment rebalance counter when needed
+    // This is the CORE function that implements the rebalancing logic
+    AVLNode* balanceTree(AVLNode* node) {
+        if (node == NULL) return node;
+        
+        // Step 1: Update height of current node based on children
+        updateHeight(node);
+        
+        // Step 2: Calculate balance factor to check if rebalancing is needed
+        int balance = getBalanceFactor(node);
+        
+        // Step 3: CRITICAL - Increment counter if THIS node is unbalanced
+        // A node is unbalanced when |balance factor| > 1
+        // This means the height difference between subtrees exceeds 1
+        if (balance > 1 || balance < -1) {
+            // This node IS unbalanced, so increment its counter
+            node->rebalanceCount++;
+        }
+        
+        // Step 4: Perform the appropriate rotations based on imbalance type
+        
+        // Case 1: Left-Left (LL) 
+        // Node is left-heavy (balance > 1) AND 
+        // left child is left-heavy or balanced (BF >= 0)
+        if (balance > 1 && getBalanceFactor(node->left) >= 0) {
+            return rotateRight(node);
+        }
+        
+        // Case 2: Left-Right (LR)
+        // Node is left-heavy (balance > 1) BUT 
+        // left child is right-heavy (BF < 0)
+        // Solution: First rotate left child left, then rotate node right
+        if (balance > 1 && getBalanceFactor(node->left) < 0) {
+            node->left = rotateLeft(node->left);
+            return rotateRight(node);
+        }
+        
+        // Case 3: Right-Right (RR)
+        // Node is right-heavy (balance < -1) AND 
+        // right child is right-heavy or balanced (BF <= 0)
+        if (balance < -1 && getBalanceFactor(node->right) <= 0) {
+            return rotateLeft(node);
+        }
+        
+        // Case 4: Right-Left (RL)
+        // Node is right-heavy (balance < -1) BUT 
+        // right child is left-heavy (BF > 0)
+        // Solution: First rotate right child right, then rotate node left
+        if (balance < -1 && getBalanceFactor(node->right) > 0) {
+            node->right = rotateRight(node->right);
+            return rotateLeft(node);
+        }
+        
+        // No rotation needed, tree is balanced at this node
+        return node;
+    }
+    
+    // Recursive insertion with balancing
+    // Inserts a value and rebalances the tree on the way back up the recursion
+    AVLNode* insertRecursive(AVLNode* node, int value) {
+        // Step 1: Standard BST insertion (base case)
+        if (node == NULL) {
+            return new AVLNode(value);
+        }
+        
+        // Step 2: Recursively insert in appropriate subtree
+        // Insert in left subtree if value is smaller
+        if (value < node->data) {
+            node->left = insertRecursive(node->left, value);
+        } 
+        // Insert in right subtree if value is larger
+        else if (value > node->data) {
+            node->right = insertRecursive(node->right, value);
+        } 
+        // Duplicate values not allowed in AVL tree
+        else {
+            return node;
+        }
+        
+        // Step 3: After insertion, balance this node on the way back up
+        // This checks if current node became unbalanced due to insertion
+        // and performs rotations if needed
+        // IMPORTANT: This happens during BACKTRACKING from recursion
+        return balanceTree(node);
+    }
+    
+    // Inorder traversal to display rebalance counts
+    // Visits nodes in sorted order (left, root, right)
+    void displayRebalanceCounts(AVLNode* node) {
+        if (node == NULL) return;
+        
+        // Traverse left subtree (smaller values)
+        displayRebalanceCounts(node->left);
+        
+        // Display current node's rebalance count
+        cout << "Node " << node->data << " was rebalanced " 
+             << node->rebalanceCount << " time";
+        if (node->rebalanceCount != 1) {
+            cout << "s";
+        }
+        cout << endl;
+        
+        // Traverse right subtree (larger values)
+        displayRebalanceCounts(node->right);
+    }
+    
+    // Helper to delete tree (clean up memory)
+    void deleteTree(AVLNode* node) {
+        if (node == NULL) return;
+        deleteTree(node->left);
+        deleteTree(node->right);
+        delete node;
+    }
+    
+public:
+    // Constructor - initializes empty tree
+    AVLTree() {
+        root = NULL;
+    }
+    
+    // Destructor - cleans up memory when tree is destroyed
+    ~AVLTree() {
+        deleteTree(root);
+    }
+    
+    // Public method to insert value
+    // User calls this, which internally calls the recursive version
+    void insert(int value) {
+        root = insertRecursive(root, value);
+    }
+    
+    // Public method to display rebalance counts
+    void displayRebalanceStats() {
+        if (root == NULL) {
+            cout << "Tree is empty!" << endl;
+            return;
+        }
+        
+        cout << "\n--- Rebalancing Statistics ---" << endl;
+        displayRebalanceCounts(root);
+    }
+    
+    // Get height of entire tree (height of root)
+    int getTreeHeight() {
+        return getHeight(root);
+    }
+    
+    // Check if tree is balanced at root level
+    bool isBalanced() {
+        int balance = getBalanceFactor(root);
+        if (balance < 0) balance = -balance; // Get absolute value
+        return balance <= 1;
+    }
+};
+
+// Main function to demonstrate AVL Tree with rebalancing tracking
+int main() {
+    AVLTree avl;
+    int n, value;
+    
+    // Get number of elements from user
+    cout << "Enter number of elements to insert: ";
+    cin >> n;
+    
+    // Insert elements one by one
+    cout << "Enter " << n << " integer elements:" << endl;
+    for (int i = 0; i < n; i++) {
+        cin >> value;
+        avl.insert(value);
+    }
+    
+    // Display rebalancing statistics for all nodes
+    avl.displayRebalanceStats();
+    
+    // Additional validation information
+    cout << "\n--- Validation ---" << endl;
+    cout << "Tree height: " << avl.getTreeHeight() << endl;
+    cout << "Tree is ";
+    if (avl.isBalanced()) {
+        cout << "balanced";
+    } else {
+        cout << "NOT balanced";
+    }
+    cout << endl;
+    
+    return 0;
+}
+
+---END OF CODE---
+
+================================================================================
+9. TESTING AND VALIDATION
+================================================================================
+
+Test Case 1: Input (9, 4, 5, 10, 20)
+-------------------------------------
+Expected Output:
+Node 4 was rebalanced 0 times
+Node 5 was rebalanced 0 times
+Node 9 was rebalanced 2 times
+Node 10 was rebalanced 0 times
+Node 20 was rebalanced 0 times
+
+Tree height: 2
+Tree is balanced
+
+Explanation:
+- Node 9 became unbalanced twice (after inserting 5 and after inserting 20)
+- All other nodes remained balanced throughout all insertions
+- Final tree is balanced with height 2
+
+Test Case 2: Sequential Input (1, 2, 3, 4, 5)
+----------------------------------------------
+Expected Output:
+Node 1 was rebalanced 1 time
+Node 2 was rebalanced 0 times
+Node 3 was rebalanced 1 time
+Node 4 was rebalanced 0 times
+Node 5 was rebalanced 0 times
+
+Explanation:
+- Without AVL balancing, this would create a skewed tree (linked list)
+- Node 1 becomes unbalanced after inserting 3
+- Node 3 becomes unbalanced after inserting 5
+- Rotations keep the tree balanced
+
+Test Case 3: Balanced Input (10, 5, 15, 3, 7, 12, 20)
+------------------------------------------------------
+Expected Output:
+All nodes show 0 times rebalanced
+
+Explanation:
+- This insertion order naturally creates a balanced tree
+- No node ever becomes unbalanced
+- No rotations needed
+
+================================================================================
+10. KEY TAKEAWAYS
+================================================================================
+
+1. BALANCE FACTOR DEFINITION:
+   - BF = Height(Left Subtree) - Height(Right Subtree)
+   - Balanced: |BF| <= 1
+   - Unbalanced: |BF| > 1
+
+2. WHEN TO INCREMENT COUNTER:
+   - ONLY when a specific node's |BF| > 1
+   - This indicates THAT node is unbalanced
+   - Increment happens BEFORE rotation
+
+3. ROTATION TIMING:
+   - Rotations happen AFTER incrementing counter
+   - Rotations fix the imbalance locally
+   - Fixed nodes prevent imbalance from propagating upward
+
+4. BOTTOM-UP PROCESSING:
+   - AVL balancing works during recursive backtracking
+   - Check and fix lower nodes first
+   - This prevents cascading imbalances to higher nodes
+
+5. THE CRITICAL INSIGHT:
+   - When a lower node gets rotated and fixed, it prevents higher nodes 
+     from becoming unbalanced
+   - This is why node 5 never became unbalanced in our example
+   - Node 9's rotation fixed the problem before it reached node 5
+
+6. CODE STRUCTURE:
+   - Insert using standard BST insertion
+   - On the way back up: update height, check balance, rotate if needed
+   - The balanceTree() function encapsulates all balancing logic
+
+7. TESTING APPROACH:
+   - Test with sequential input (worst case for unbalanced BST)
+   - Test with already-balanced input
+   - Test with mixed input like (9, 4, 5, 10, 20)
+   - Verify final tree height is logarithmic
+
+8. COMMON MISTAKES TO AVOID:
+   - Don't increment counter for every node checked
+   - Don't increment counter for nodes with |BF| = 1 (that's balanced!)
+   - Don't forget to update heights before checking balance
+   - Don't rotate before incrementing counter
+
+9. WHY THIS MATTERS:
+   - AVL trees guarantee O(log n) operations
+   - Understanding rebalancing helps debug and optimize tree operations
+   - The counter helps visualize which nodes are problematic in certain 
+     insertion sequences
+
+10. VISUALIZATION TIP:
+    - Draw trees on paper for each insertion
+    - Calculate and write balance factors for each node
+    - Mark nodes with |BF| > 1
+    - Trace rotations step by step
+    - This builds deep intuition for AVL trees
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+
+This document provides a complete, coherent explanation of AVL trees with 
+rebalancing counters. It covers theoretical concepts, implementation details,
+step-by-step traces, and addresses the specific question about why node 5 
+stays balanced.
+
+For any questions or clarifications, review the step-by-step trace section
+and the code comments carefully. The key is understanding that rotations at
+lower levels prevent imbalances from propagating upward.
+
+Good luck with your DSA lab!

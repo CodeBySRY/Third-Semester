@@ -1,0 +1,13 @@
+- In an optimum solution, set the pivot to be the middle point of the array.
+
+In setting the pivot:
+- Swap the middle element with the last element.
+	- This sets the pivot at the last element.
+- The position of the pivot is fixed at the last element.
+- Compare the first element (arr[0]), with the pivot element, which is at the last position.
+If arr[0] > arr[pivot]; then:
+	- Then, the last element is fixed, and the middle element is fixed, after the initial swap.
+If arr[0] < arr[pivot]; then:
+	- Reverse the swap: bring back the last element to the middle, and the middle element, back to the last position.
+
+THE PIVOT IS FIXED AT THE END, AFTER THE INITIAL SWAP.

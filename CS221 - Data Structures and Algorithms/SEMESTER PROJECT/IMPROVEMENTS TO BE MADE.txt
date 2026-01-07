@@ -1,0 +1,13 @@
+What can be added/improved in the program?
+- UI
+- Strict Error handling
+- Functions to add Patient's details (such as first name and last name) and save to file
+- DBMS
+
+
+For the UI of the project, and the functionalities, I want it to resemble an actual hospital, and the backend that it entails, and it should, ABSOLUTELY, at all costs, offer a slightly better technical edge, compared to other backend solutions.
+Other than that, I need you to DESCRIBE a UI, that incorporates the theme of black, green, and white, and it should be minimalist.
+FYI, I am working on the following things, as an addition to the project, now that it needs to be pitched to recruiters, and I need to have a solid addition on my resume.
+
+
+Everything should rely on the simple motto: Keep things simple.

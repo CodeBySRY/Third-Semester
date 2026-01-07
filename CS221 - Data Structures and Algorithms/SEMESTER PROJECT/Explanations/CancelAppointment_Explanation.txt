@@ -1,0 +1,1254 @@
+================================================================================
+COMPREHENSIVE EXPLANATION: CancelAppointment SYSTEM
+================================================================================
+
+PROJECT: CareSync Hub - Hospital Management System
+REQUIREMENT: #5 - Cancel an existing appointment and update all relevant lists
+MARKS: 9 / 80
+AUTHOR: Technical Documentation
+DATE: Day 2 - Appointment Management Module
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. High-Level Overview
+2. Architecture & Design Philosophy
+3. Function Breakdown (Code-Level Analysis)
+4. Algorithm Explanation
+5. Memory Management
+6. Edge Cases & Error Handling
+7. Time & Space Complexity
+8. Integration with Existing System
+9. Testing Strategy
+10. Viva Defense Points
+
+================================================================================
+1. HIGH-LEVEL OVERVIEW
+================================================================================
+
+PURPOSE:
+--------
+The CancelAppointment system removes a specific appointment from the hospital
+management system given only its appointment ID. This requires:
+  - Searching across the entire Doctor BST
+  - Finding the correct appointment in a doctor's linked list
+  - Removing the node from the linked list
+  - Properly deallocating memory
+  - Returning success/failure status
+
+CHALLENGE:
+----------
+Unlike insertion where we know the doctorId, cancellation only receives an
+appointmentId. This means we must:
+  1. Search EVERY doctor in the BST
+  2. Search EVERY appointment in each doctor's list
+  3. Handle deletion from any position (head, middle, tail)
+
+DATA STRUCTURE CONTEXT:
+-----------------------
+Appointments are stored as:
+  - Doctor BST → Each DoctorNode has → Appointment Linked List (sorted)
+  
+  Example Structure:
+  
+        Doctor(150)
+        /         \
+   Doctor(102)   Doctor(215)
+       |             |
+    [Apt1]→[Apt2]  [Apt3]→[Apt4]
+    
+To cancel Apt2, we must:
+  - Traverse BST to find Doctor(102)
+  - Traverse linked list to find Apt2
+  - Remove Apt2 from the list
+  - Free memory
+
+================================================================================
+2. ARCHITECTURE & DESIGN PHILOSOPHY
+================================================================================
+
+DESIGN PATTERN: Separation of Concerns
+---------------------------------------
+
+The system is split into THREE distinct functions:
+
+1. CancelAppointment()              ← PUBLIC API (what user calls)
+2. CancelAppointmentHelper()        ← BST TRAVERSAL (recursive tree search)
+3. CancelAppointmentFromDoctor()    ← LIST DELETION (linked list operation)
+
+WHY THIS SEPARATION?
+--------------------
+
+[A] MODULARITY:
+    Each function has ONE clear responsibility:
+    - CancelAppointment:         User interface & feedback
+    - CancelAppointmentHelper:   Tree traversal logic
+    - CancelAppointmentFromDoctor: Linked list manipulation
+    
+[B] TESTABILITY:
+    Can test linked list deletion independently from tree traversal
+    
+[C] CODE REUSE:
+    If we later need "delete all appointments from doctor", we already have
+    CancelAppointmentFromDoctor() ready
+    
+[D] VIVA DEFENSIBILITY:
+    Clear separation shows understanding of:
+    - Recursive tree algorithms
+    - Iterative list algorithms
+    - Interface design patterns
+
+ALTERNATIVE (BAD) APPROACH:
+---------------------------
+We could write ONE giant function that does everything:
+
+    bool CancelAppointment(Doctor* root, int appId) {
+        // Mix tree traversal AND list deletion in one place
+        // Hard to read, hard to test, hard to debug
+    }
+
+Why is this worse?
+- Violates Single Responsibility Principle
+- Harder to debug (which part failed?)
+- Can't reuse list deletion logic
+- Difficult to explain in viva
+
+================================================================================
+3. FUNCTION BREAKDOWN (CODE-LEVEL ANALYSIS)
+================================================================================
+
+--------------------------------------------------------------------------------
+FUNCTION 1: CancelAppointment() - The Public Interface
+--------------------------------------------------------------------------------
+
+SIGNATURE:
+    bool CancelAppointment(Doctor* root, int appId)
+
+PARAMETERS:
+    - Doctor* root:   The root of the Doctor BST
+    - int appId:      The appointment ID to cancel
+
+RETURNS:
+    - bool:           true if cancelled successfully, false if not found
+
+CODE:
+-----
+bool CancelAppointment(Doctor* root, int appId) {
+    bool success = CancelAppointmentHelper(root, appId);
+    
+    if (success) {
+        cout << "Appointment ID " << appId << " cancelled successfully.\n";
+    } else {
+        cout << "Error: Appointment ID " << appId << " not found.\n";
+    }
+    
+    return success;
+}
+
+LINE-BY-LINE EXPLANATION:
+--------------------------
+
+Line 1: bool success = CancelAppointmentHelper(root, appId);
+    - Delegates actual work to helper function
+    - Helper returns true/false indicating success
+    - This function just handles user feedback
+
+Line 3-7: User feedback
+    - Prints success or error message
+    - Good practice: Always give user feedback on operations
+    - Separates "business logic" from "presentation logic"
+
+Line 9: return success;
+    - Returns status for programmatic use
+    - Allows calling code to check: if (CancelAppointment(...)) { ... }
+
+DESIGN CHOICE: Why not just call the helper directly?
+------------------------------------------------------
+We COULD let users call CancelAppointmentHelper() directly, but:
+    - Helper is implementation detail (should be private/static)
+    - This function provides clean API with user feedback
+    - If we later add logging, we add it here once
+
+--------------------------------------------------------------------------------
+FUNCTION 2: CancelAppointmentHelper() - BST Traversal
+--------------------------------------------------------------------------------
+
+SIGNATURE:
+    bool CancelAppointmentHelper(Doctor* root, int appId)
+
+PARAMETERS:
+    - Doctor* root:   Current node in BST (changes during recursion)
+    - int appId:      The appointment ID we're searching for
+
+RETURNS:
+    - bool:           true if found and deleted, false otherwise
+
+CODE:
+-----
+bool CancelAppointmentHelper(Doctor* root, int appId) {
+    // Base case: reached null node
+    if (root == nullptr) {
+        return false;
+    }
+    
+    // Try to cancel from current doctor
+    if (CancelAppointmentFromDoctor(root, appId)) {
+        return true;
+    }
+    
+    // Recursively search left subtree
+    if (CancelAppointmentHelper(root->left, appId)) {
+        return true;
+    }
+    
+    // Recursively search right subtree
+    return CancelAppointmentHelper(root->right, appId);
+}
+
+LINE-BY-LINE EXPLANATION:
+--------------------------
+
+Line 2-4: Base case
+    if (root == nullptr) {
+        return false;
+    }
+    
+    WHY?
+    - Recursion needs a stopping condition
+    - If we reach a null node, the appointment isn't in this subtree
+    - Return false = "not found here"
+    
+    WHEN does this happen?
+    - When we reach a leaf's child
+    - When the tree is empty (initial call with nullptr)
+
+Line 7-9: Check current doctor
+    if (CancelAppointmentFromDoctor(root, appId)) {
+        return true;
+    }
+    
+    LOGIC:
+    - Try to delete from THIS doctor's appointment list
+    - If successful, return true immediately (EARLY EXIT)
+    - No need to search further once found
+    
+    OPTIMIZATION:
+    - Short-circuit evaluation saves time
+    - If appointment found in left subtree, we don't traverse right
+
+Line 12-14: Search left subtree
+    if (CancelAppointmentHelper(root->left, appId)) {
+        return true;
+    }
+    
+    RECURSION:
+    - Recursively search the left child's entire subtree
+    - If found there, propagate true up the call stack
+    - If not found, continue to right subtree
+
+Line 17: Search right subtree
+    return CancelAppointmentHelper(root->right, appId);
+    
+    FINAL ATTEMPT:
+    - Last chance: search right subtree
+    - Return whatever the right subtree returns
+    - If right returns false, the appointment doesn't exist
+
+TRAVERSAL ORDER:
+----------------
+This is a MODIFIED PREORDER TRAVERSAL:
+    1. Process current (check this doctor)
+    2. Recurse left
+    3. Recurse right
+
+Why not in-order or post-order?
+- Doesn't matter! We need to check ALL nodes anyway
+- Preorder is simplest: check current first, then children
+
+KEY INSIGHT: Early Exit Optimization
+-------------------------------------
+Once we find the appointment, we immediately return true.
+This causes all recursive calls to unwind with true, stopping further search.
+
+Example call stack when appointment found in left subtree:
+
+    CancelAppointmentHelper(root=150)
+        |
+        +--> CancelAppointmentHelper(root=102)  ← Found here!
+        |        return true
+        |
+        return true  (doesn't check root=215)
+
+--------------------------------------------------------------------------------
+FUNCTION 3: CancelAppointmentFromDoctor() - Linked List Deletion
+--------------------------------------------------------------------------------
+
+SIGNATURE:
+    bool CancelAppointmentFromDoctor(Doctor* doc, int appId)
+
+PARAMETERS:
+    - Doctor* doc:    The doctor whose appointment list to search
+    - int appId:      The appointment ID to delete
+
+RETURNS:
+    - bool:           true if found and deleted from this doctor, false otherwise
+
+CODE:
+-----
+bool CancelAppointmentFromDoctor(Doctor* doc, int appId) {
+    if (doc == nullptr || doc->appointments == nullptr) {
+        return false;
+    }
+    
+    Appointment* curr = doc->appointments;
+    Appointment* prev = nullptr;
+    
+    while (curr != nullptr) {
+        if (curr->appId == appId) {
+            // Found it! Remove from list
+            if (prev == nullptr) {
+                // Removing head
+                doc->appointments = curr->next;
+            } else {
+                // Removing middle/end
+                prev->next = curr->next;
+            }
+            
+            // Free memory
+            delete curr;
+            return true;
+        }
+        
+        prev = curr;
+        curr = curr->next;
+    }
+    
+    return false;  // Not found in this doctor's list
+}
+
+LINE-BY-LINE EXPLANATION:
+--------------------------
+
+Line 2-4: Null checks
+    if (doc == nullptr || doc->appointments == nullptr) {
+        return false;
+    }
+    
+    SAFETY FIRST:
+    - What if doc is null? (shouldn't happen, but defensive)
+    - What if doctor has no appointments? (common case)
+    - Return false = "not found here"
+
+Line 6-7: Two-pointer setup
+    Appointment* curr = doc->appointments;
+    Appointment* prev = nullptr;
+    
+    CLASSIC LINKED LIST PATTERN:
+    - curr: The node we're examining
+    - prev: The node BEFORE curr (for relinking)
+    
+    WHY DO WE NEED PREV?
+    To delete a node from a singly linked list, we need to update the
+    previous node's 'next' pointer. Without prev, we can't do this.
+    
+    Example:
+        prev → curr → next
+        
+    To delete curr:
+        prev->next = curr->next;  // Need prev to relink!
+
+Line 9: Loop through list
+    while (curr != nullptr) {
+    
+    STANDARD TRAVERSAL:
+    - Continue until we've checked all nodes
+    - curr becomes nullptr when we reach end of list
+
+Line 10: Check if this is the target
+    if (curr->appId == appId) {
+    
+    FOUND IT!
+    - Now we need to remove curr from the list
+    - Two cases: head deletion vs middle/tail deletion
+
+Line 12-14: Case 1 - Deleting HEAD
+    if (prev == nullptr) {
+        doc->appointments = curr->next;
+    }
+    
+    SCENARIO:
+        Before:  doc->appointments → [A] → [B] → [C]
+                                      ^
+                                     curr (A is target)
+        
+        After:   doc->appointments → [B] → [C]
+        
+    WHY prev == nullptr?
+    - We haven't moved prev yet
+    - This means curr is still the first node
+    
+    ACTION:
+    - Point head directly to the second node
+    - Effectively "skips" the current head
+
+Line 15-17: Case 2 - Deleting MIDDLE or TAIL
+    else {
+        prev->next = curr->next;
+    }
+    
+    SCENARIO (Middle):
+        Before:  [A] → [B] → [C] → [D]
+                  ^     ^     ^
+                 prev  curr  next
+        
+        After:   [A] → [C] → [D]
+                  ^     ^
+                 prev  next
+        
+    SCENARIO (Tail):
+        Before:  [A] → [B] → [C] → nullptr
+                  ^     ^     ^
+                 prev  curr  next (nullptr)
+        
+        After:   [A] → [B] → nullptr
+                  ^     ^
+                 prev  next (nullptr)
+        
+    ACTION:
+    - Bypass curr by linking prev directly to curr->next
+    - Works for both middle and tail cases
+
+Line 20-21: Free memory
+    delete curr;
+    return true;
+    
+    CRITICAL MEMORY MANAGEMENT:
+    - delete curr: Calls destructor and frees memory
+    - Must do this AFTER relinking (otherwise we lose the pointer)
+    - return true: Signal success
+    
+    DANGER if we forget 'delete':
+    - MEMORY LEAK! The node's memory is never reclaimed
+    - Over time, program uses more and more RAM
+    - Eventually: out of memory
+
+Line 24-25: Move to next node
+    prev = curr;
+    curr = curr->next;
+    
+    STANDARD TRAVERSAL:
+    - prev "catches up" to where curr was
+    - curr moves to next node
+    - Continue loop
+
+Line 28: Not found
+    return false;
+    
+    EXIT CONDITION:
+    - Loop ended (curr became nullptr)
+    - Never found matching appId
+    - Return false = "not in this doctor's list"
+
+================================================================================
+4. ALGORITHM EXPLANATION
+================================================================================
+
+OVERALL ALGORITHM:
+------------------
+
+Step 1: Start at BST root
+Step 2: For current doctor node:
+    Step 2a: Search their appointment list
+    Step 2b: If found, delete and return success
+Step 3: Recursively search left subtree
+Step 4: Recursively search right subtree
+Step 5: If all searches fail, return not found
+
+PSEUDOCODE:
+-----------
+
+function CancelAppointment(root, appId):
+    found = SearchAndDeleteInBST(root, appId)
+    print feedback based on found
+    return found
+
+function SearchAndDeleteInBST(node, appId):
+    if node is null:
+        return false
+    
+    if DeleteFromList(node.appointments, appId):
+        return true
+    
+    if SearchAndDeleteInBST(node.left, appId):
+        return true
+    
+    return SearchAndDeleteInBST(node.right, appId)
+
+function DeleteFromList(head, appId):
+    if list is empty:
+        return false
+    
+    use two-pointer technique:
+        curr = head
+        prev = null
+    
+    while curr is not null:
+        if curr.appId == appId:
+            if prev is null:
+                head = curr.next  // Delete head
+            else:
+                prev.next = curr.next  // Delete middle/tail
+            
+            free(curr)
+            return true
+        
+        prev = curr
+        curr = curr.next
+    
+    return false
+
+VISUAL EXAMPLE:
+---------------
+
+Initial State:
+
+            Doctor(150)
+            /         \
+       Doctor(102)   Doctor(215)
+           |             |
+        [Apt1]→[Apt3]  [Apt6]→[Apt7]
+
+Call: CancelAppointment(root, 3)
+
+Execution Trace:
+
+1. CancelAppointmentHelper(Doctor(150), 3)
+   - Check Doctor(150)'s list: [None] → Not found
+   - Recurse left: CancelAppointmentHelper(Doctor(102), 3)
+   
+2. CancelAppointmentHelper(Doctor(102), 3)
+   - Check Doctor(102)'s list: [Apt1, Apt3]
+   - CancelAppointmentFromDoctor(Doctor(102), 3)
+     - curr=Apt1, appId=1 ≠ 3, continue
+     - curr=Apt3, appId=3 == 3, FOUND!
+     - prev=Apt1, so: prev->next = curr->next
+     - delete Apt3
+     - return true
+   - Returns true to caller
+   
+3. Back to CancelAppointmentHelper(Doctor(150), 3)
+   - Left returned true, immediately return true
+   - Never searches right subtree (optimization!)
+
+4. Back to CancelAppointment()
+   - success = true
+   - Print "Appointment ID 3 cancelled successfully."
+
+Final State:
+
+            Doctor(150)
+            /         \
+       Doctor(102)   Doctor(215)
+           |             |
+         [Apt1]       [Apt6]→[Apt7]
+
+================================================================================
+5. MEMORY MANAGEMENT
+================================================================================
+
+CRITICAL OPERATION: delete curr;
+
+What happens when we call 'delete'?
+------------------------------------
+
+1. DESTRUCTOR CALL (if any):
+   - Appointment struct has no explicit destructor
+   - But if it had pointers to dynamically allocated memory, destructor would
+     be called to clean up
+
+2. MEMORY DEALLOCATION:
+   - The memory occupied by the Appointment struct is freed
+   - Returned to the system's memory pool
+   - Available for future allocations
+
+3. POINTER BECOMES INVALID:
+   - curr now points to freed memory (dangling pointer)
+   - We immediately return, so we never use curr again
+   - If we tried to access curr->appId after delete → UNDEFINED BEHAVIOR
+
+MEMORY LEAK SCENARIO (If we forget 'delete'):
+----------------------------------------------
+
+Iteration 1:
+    [Memory: 1000 bytes used]
+    Create Apt1, Apt2, Apt3
+    [Memory: 1120 bytes used]  (+120 for 3 appointments)
+
+Cancel Apt2 WITHOUT delete:
+    List now: Apt1 → Apt3
+    But Apt2's memory is still allocated (orphaned)
+    [Memory: 1120 bytes used]  (Apt2 = 40 bytes wasted)
+
+After 1000 cancellations without delete:
+    [Memory: 41000 bytes wasted]
+    Eventually: OUT OF MEMORY error
+
+WHY ORDER MATTERS (delete AFTER relinking):
+--------------------------------------------
+
+CORRECT ORDER:
+    prev->next = curr->next;  // Relink first
+    delete curr;              // Then free
+
+WRONG ORDER:
+    delete curr;              // Free first
+    prev->next = curr->next;  // DANGER! curr->next is accessing freed memory!
+    
+Result: Undefined behavior (crash, corruption, or seemingly works but unstable)
+
+VISUAL MEMORY STATE:
+--------------------
+
+Before deletion:
+    Memory Address | Content
+    ---------------|---------
+    0x1000        | Doctor(102)
+    0x1040        | ├─ appointments = 0x2000
+    ...           | ...
+    0x2000        | Appointment{appId=1, next=0x2040}
+    0x2040        | Appointment{appId=3, next=nullptr}
+
+After relinking:
+    0x1000        | Doctor(102)
+    0x1040        | ├─ appointments = 0x2040  (changed)
+    ...           | ...
+    0x2000        | Appointment{appId=1, next=0x2040}  (orphaned)
+    0x2040        | Appointment{appId=3, next=nullptr}
+
+After delete:
+    0x1000        | Doctor(102)
+    0x1040        | ├─ appointments = 0x2040
+    ...           | ...
+    0x2000        | [FREED MEMORY - DO NOT ACCESS]
+    0x2040        | Appointment{appId=3, next=nullptr}
+
+================================================================================
+6. EDGE CASES & ERROR HANDLING
+================================================================================
+
+EDGE CASE 1: Empty Tree
+------------------------
+Input: CancelAppointment(nullptr, 5)
+
+Execution:
+    - CancelAppointmentHelper(nullptr, 5)
+    - Base case: root == nullptr → return false
+    - CancelAppointment prints "not found"
+
+Result: ✓ Handled gracefully
+
+EDGE CASE 2: Empty Appointment List
+------------------------------------
+Input: Doctor exists but has no appointments
+
+Execution:
+    - CancelAppointmentFromDoctor(doc, 5)
+    - Check: doc->appointments == nullptr → return false
+    - Continue searching other doctors
+
+Result: ✓ Handled gracefully
+
+EDGE CASE 3: Deleting Only Appointment
+---------------------------------------
+Initial: Doctor(102) → [Apt5]
+
+Execution:
+    - curr = Apt5, prev = nullptr
+    - Match found: appId == 5
+    - prev == nullptr → doc->appointments = curr->next (nullptr)
+    - delete Apt5
+
+Result: Doctor(102) → nullptr
+Status: ✓ List becomes empty correctly
+
+EDGE CASE 4: Deleting Head (Multiple Appointments)
+---------------------------------------------------
+Initial: Doctor(102) → [Apt1] → [Apt3] → [Apt5]
+
+Execution for appId=1:
+    - curr = Apt1, prev = nullptr
+    - Match found
+    - prev == nullptr → doc->appointments = Apt1->next (Apt3)
+    - delete Apt1
+
+Result: Doctor(102) → [Apt3] → [Apt5]
+Status: ✓ New head established correctly
+
+EDGE CASE 5: Deleting Tail
+---------------------------
+Initial: Doctor(102) → [Apt1] → [Apt3] → [Apt5]
+
+Execution for appId=5:
+    - Iteration 1: curr=Apt1, prev=nullptr, no match
+    - Iteration 2: curr=Apt3, prev=Apt1, no match
+    - Iteration 3: curr=Apt5, prev=Apt3, MATCH
+    - prev != nullptr → prev->next = curr->next (nullptr)
+    - delete Apt5
+
+Result: Doctor(102) → [Apt1] → [Apt3]
+Status: ✓ Tail properly removed
+
+EDGE CASE 6: Deleting Middle
+-----------------------------
+Initial: Doctor(102) → [Apt1] → [Apt3] → [Apt5]
+
+Execution for appId=3:
+    - Iteration 1: curr=Apt1, prev=nullptr, no match
+    - Iteration 2: curr=Apt3, prev=Apt1, MATCH
+    - prev != nullptr → prev->next = curr->next (Apt5)
+    - delete Apt3
+
+Result: Doctor(102) → [Apt1] → [Apt5]
+Status: ✓ Middle node bridged correctly
+
+EDGE CASE 7: Non-Existent Appointment
+--------------------------------------
+Input: CancelAppointment(root, 999)
+
+Execution:
+    - Searches all doctors
+    - Searches all appointments in each list
+    - Never finds appId=999
+    - Returns false
+
+Result: "Appointment ID 999 not found."
+Status: ✓ User informed of failure
+
+EDGE CASE 8: Duplicate Appointment IDs (Shouldn't Happen)
+----------------------------------------------------------
+If somehow two appointments have the same ID:
+    Doctor(102) → [Apt(id=5)] → [Apt(id=5)]
+
+Execution:
+    - First match found
+    - Deleted immediately
+    - Returns true (stops searching)
+
+Result: Only first duplicate deleted
+Note: This is a data integrity issue - should be prevented at insertion
+
+ERROR HANDLING SUMMARY:
+-----------------------
+✓ Null pointer checks
+✓ Empty list checks
+✓ Graceful failure (return false, not crash)
+✓ Clear user feedback
+✓ No memory leaks in any path
+
+================================================================================
+7. TIME & SPACE COMPLEXITY
+================================================================================
+
+TIME COMPLEXITY:
+----------------
+
+WORST CASE: O(N * M)
+Where:
+    N = Number of doctors in BST
+    M = Average number of appointments per doctor
+
+BREAKDOWN:
+    - BST traversal: O(N) - must check all doctors in worst case
+    - List traversal: O(M) - must check all appointments per doctor
+    - Combined: O(N * M)
+
+BEST CASE: O(log N + 1)
+Where:
+    - Appointment found in first doctor checked
+    - BST traversal: O(log N) if balanced
+    - List traversal: O(1) if appointment is head
+
+AVERAGE CASE: O(N * M / 2)
+    - On average, find appointment halfway through search
+
+COMPARISON TO ALTERNATIVE DESIGNS:
+-----------------------------------
+
+Design 1 (Current): Store appointments per doctor
+    - Insert: O(M) - search one doctor's list
+    - Cancel: O(N * M) - search all doctors
+    - Query by doctor: O(M) - one list
+    - Query by patient: O(N * M) - all doctors
+
+Design 2: Global appointment hash table by appId
+    - Insert: O(1) - hash table
+    - Cancel: O(1) - hash table
+    - Query by doctor: O(A) - scan all appointments
+    - Query by patient: O(A) - scan all appointments
+    Where A = total appointments in system
+
+Design 3: Dual structure (per doctor + global hash)
+    - Insert: O(M) + O(1) - both structures
+    - Cancel: O(1) + O(M) - hash + list deletion
+    - Memory: 2x (two copies of each appointment)
+
+Our design prioritizes:
+    ✓ Simplicity (single source of truth)
+    ✓ Memory efficiency (no duplication)
+    ✓ Fast doctor-centric queries (common use case)
+    ✗ Slower cancel operations (less common)
+
+SPACE COMPLEXITY:
+-----------------
+
+AUXILIARY SPACE: O(log N) to O(N)
+    - Recursive call stack for BST traversal
+    - Best case (balanced BST): O(log N)
+    - Worst case (skewed BST): O(N)
+
+OPTIMIZATION: Could convert to iterative with explicit stack
+    - Would have same space complexity but more control
+
+NO EXTRA DATA STRUCTURES:
+    - prev pointer: O(1)
+    - curr pointer: O(1)
+    - Total auxiliary: O(1) for list traversal
+
+================================================================================
+8. INTEGRATION WITH EXISTING SYSTEM
+================================================================================
+
+DEPENDENCIES:
+-------------
+
+CancelAppointment() depends on:
+
+1. Doctor BST (Doctor.h):
+   - FindDoctor() not directly used, but could optimize
+   - BST structure: left, right pointers
+   - appointments field
+
+2. Appointment structure (Appointment.h):
+   - appId field for comparison
+   - next pointer for list traversal
+
+3. Memory management:
+   - delete operator (C++ standard)
+
+INTEGRATION POINTS:
+-------------------
+
+Called by:
+    - main() for testing
+    - User interface functions
+    - Batch cancellation operations
+
+Calls:
+    - CancelAppointmentHelper() (internal)
+    - CancelAppointmentFromDoctor() (internal)
+    - cout for user feedback
+
+SYSTEM STATE CHANGES:
+----------------------
+
+Before: Doctor(X) → [Apt1] → [Apt2] → [Apt3]
+After:  Doctor(X) → [Apt1] → [Apt3]
+        (Memory for Apt2 freed)
+
+CONSISTENCY GUARANTEES:
+-----------------------
+
+✓ Atomic operation: Either fully succeeds or fully fails
+✓ No partial states: List is always valid after operation
+✓ Memory safety: No leaks, no dangling pointers
+✓ Referential integrity: All pointers updated correctly
+
+TRANSACTION-LIKE BEHAVIOR:
+--------------------------
+
+This function exhibits properties similar to database transactions:
+
+1. ATOMICITY:
+   - Either appointment is deleted, or it's not
+   - No partial deletion (can't leave list in broken state)
+
+2. CONSISTENCY:
+   - List invariants maintained:
+     * If list not empty, head is valid
+     * All next pointers valid or nullptr
+     * No cycles
+
+3. ISOLATION:
+   - Function is not thread-safe (would need locking)
+   - But single-threaded execution is safe
+
+4. DURABILITY:
+   - Changes persist in memory until program exit
+   - Would need file save for true durability
+
+FUTURE ENHANCEMENTS:
+--------------------
+
+1. UNDO FUNCTIONALITY:
+   - Store deleted appointment before freeing
+   - Maintain deletion log
+   - Allow restoration
+
+2. BATCH CANCELLATION:
+   - Cancel all appointments for a doctor
+   - Cancel all appointments for a patient
+   - Reuse CancelAppointmentFromDoctor() logic
+
+3. CASCADE DELETION:
+   - When deleting a patient, cancel all their appointments
+   - When deleting a doctor, cancel all their appointments
+
+4. AUDIT TRAIL:
+   - Log who cancelled, when, and why
+   - Maintain history for compliance
+
+================================================================================
+9. TESTING STRATEGY
+================================================================================
+
+UNIT TESTS:
+-----------
+
+Test 1: Cancel existing appointment (middle of list)
+    Setup: Doctor(102) → [Apt1] → [Apt2] → [Apt3]
+    Action: CancelAppointment(root, 2)
+    Expected: true, list becomes [Apt1] → [Apt3]
+    Verify: PrintDoctorSchedule confirms Apt2 gone
+
+Test 2: Cancel head appointment
+    Setup: Doctor(102) → [Apt1] → [Apt2]
+    Action: CancelAppointment(root, 1)
+    Expected: true, list becomes [Apt2]
+    Verify: Doctor's appointments pointer now points to Apt2
+
+Test 3: Cancel tail appointment
+    Setup: Doctor(102) → [Apt1] → [Apt2]
+    Action: CancelAppointment(root, 2)
+    Expected: true, list becomes [Apt1]
+    Verify: Apt1->next is nullptr
+
+Test 4: Cancel only appointment
+    Setup: Doctor(102) → [Apt1]
+    Action: CancelAppointment(root, 1)
+    Expected: true, list becomes empty
+    Verify: Doctor's appointments pointer is nullptr
+
+Test 5: Cancel from doctor with multiple appointments
+    Setup: Doctor(102) → [Apt1, Apt2, Apt3, Apt4, Apt5]
+    Action: CancelAppointment(root, 3)
+    Expected: true, list becomes [Apt1, Apt2, Apt4, Apt5]
+
+Test 6: Cancel non-existent appointment
+    Setup: Doctor(102) → [Apt1, Apt2]
+    Action: CancelAppointment(root, 999)
+    Expected: false, list unchanged
+
+Test 7: Cancel from empty tree
+    Setup: root = nullptr
+    Action: CancelAppointment(root, 1)
+    Expected: false, no crash
+
+Test 8: Cancel when doctor has no appointments
+    Setup: Doctor(102) → nullptr
+    Action: CancelAppointment(root, 1)
+    Expected: false, searches other doctors
+
+Test 9: Double cancellation
+    Setup: Doctor(102) → [Apt1]
+    Action: CancelAppointment(root, 1)
+    Action: CancelAppointment(root, 1)  // Again
+    Expected: First succeeds, second fails
+
+Test 10: Cancel from complex BST
+    Setup:
+            Doctor(150)
+            /         \
+       Doctor(102)   Doctor(215)
+           |             |
+        [Apt1]        [Apt5]
+    
+    Action: CancelAppointment(root, 5)
+    Expected: true, found in right subtree
+
+INTEGRATION TESTS:
+------------------
+
+Test A: Full workflow
+    1. AddAppointment(102, 1, ...)
+    2. AddAppointment(102, 2, ...)
+    3. AddAppointment(102, 3, ...)
+    4. PrintDoctorSchedule(102, date) → Shows 3 appointments
+    5. CancelAppointment(root, 2)
+    6. PrintDoctorSchedule(102, date) → Shows 2 appointments
+    Verify: Correct appointments remain
+
+Test B: Cancel and re-add same slot
+    1. AddAppointment(102, 1, date, 1400, 1500, 501)
+    2. CancelAppointment(root, 1)
+    3. AddAppointment(102, 2, date, 1400, 1500, 502)  // Same time
+    Expected: All succeed, no overlap detected (because Apt1 gone)
+
+Test C: Patient perspective
+    1. AddAppointment(102, 1, date, 1400, 1500, 501)
+    2. AddAppointment(215, 2, date, 1600, 1700, 501)  // Same patient
+    3. PrintPatientAppointments(root, 501) → Shows 2
+    4. CancelAppointment(root, 1)
+    5. PrintPatientAppointments(root, 501) → Shows 1
+    Verify: Patient sees correct remaining appointment
+
+MEMORY TESTS:
+-------------
+
+Test M1: Memory leak detection
+    - Use valgrind or similar tool
+    - Create 1000 appointments
+    - Cancel all 1000
+    - Check: All memory freed
+
+Test M2: Repeated cancel operations
+    - Add/cancel appointments in loop 10000 times
+    - Monitor memory usage
+    - Expected: Stable (no growth)
+
+STRESS TESTS:
+-------------
+
+Test S1: Large BST
+    - 1000 doctors
+    - 100 appointments each
+    - Cancel random appointments
+    - Verify: All complete in reasonable time
+
+Test S2: Worst-case search
+    - Appointment in last doctor checked
+    - Appointment in last position of list
+    - Verify: Still completes
+
+BOUNDARY TESTS:
+---------------
+
+Test B1: Appointment ID boundaries
+    - Cancel appId = 0
+    - Cancel appId = INT_MAX
+    - Cancel appId = -1 (invalid)
+
+Test B2: Corrupted data (defensive)
+    - Simulate broken next pointer (for testing only)
+    - Ensure graceful handling
+
+================================================================================
+10. VIVA DEFENSE POINTS
+================================================================================
+
+EXPECTED QUESTIONS & ANSWERS:
+------------------------------
+
+Q1: "Why did you use three separate functions instead of one?"
+
+A: "I applied the Single Responsibility Principle. Each function has one clear
+    job:
+    - CancelAppointment: User interface and feedback
+    - CancelAppointmentHelper: BST traversal algorithm
+    - CancelAppointmentFromDoctor: Linked list manipulation
+    
+    This makes the code easier to test, debug, and maintain. If I need to
+    change how I traverse the BST, I only modify the helper function. If I
+    need to change the list deletion logic, I only modify the 'FromDoctor'
+    function. They're loosely coupled."
+
+Q2: "What's the time complexity of this operation?"
+
+A: "Worst case is O(N * M) where N is the number of doctors and M is the
+    average appointments per doctor. This is because:
+    - We might need to check every doctor in the BST: O(N)
+    - For each doctor, we might traverse their entire appointment list: O(M)
+    
+    Best case is O(log N + 1) if the BST is balanced and we find the
+    appointment in the first doctor we check.
+    
+    On average, it's O(N * M / 2) since we'd expect to find it somewhere
+    in the middle of our search."
+
+Q3: "Why do you need the 'prev' pointer?"
+
+A: "In a singly linked list, we can only traverse forward. To delete a node,
+    we need to update the previous node's 'next' pointer to skip over the
+    deleted node. Without tracking the previous node, we'd have no way to
+    relink the list.
+    
+    The exception is when deleting the head—in that case, we update the
+    list head pointer directly instead of a previous node's 'next' pointer."
+
+Q4: "What happens if you forget to call 'delete'?"
+
+A: "That's a memory leak. The appointment's memory would remain allocated
+    but unreachable—we can't access it because we've removed all pointers
+    to it, but the system still considers it in use. Over many cancellations,
+    this would waste RAM and eventually could cause the program to run out
+    of memory. That's why proper cleanup with 'delete' is critical."
+
+Q5: "Could you make this faster?"
+
+A: "Yes, several approaches:
+    
+    1. Add a global hash table mapping appointmentId → (doctorId, appointment*)
+       This would make cancellation O(1), but requires extra memory and
+       maintaining two data structures.
+    
+    2. Add an appointment index per doctor mapping appId → appointment*
+       within each doctor. This would make the list search O(1) but uses
+       more memory.
+    
+    3. If appointment IDs correlate with doctor IDs (like ID 102XXX for
+       doctor 102), we could search only the relevant doctor.
+    
+    The current design prioritizes simplicity and memory efficiency over
+    cancellation speed, which is appropriate since cancellations are
+    likely less frequent than queries."
+
+Q6: "What if two threads try to cancel the same appointment simultaneously?"
+
+A: "The current implementation is not thread-safe. If two threads both found
+    the appointment and tried to delete it, we'd have a race condition:
+    - Both might try to relink pointers simultaneously (corrupted list)
+    - Both might call delete on the same pointer (double-free error)
+    
+    To make it thread-safe, I'd need to:
+    1. Add a mutex lock around the entire cancellation operation
+    2. Or use finer-grained locks per doctor
+    3. Or use atomic operations for pointer updates
+    
+    For this single-threaded hospital system, thread safety isn't required,
+    but it's important to know the limitation."
+
+Q7: "Walk me through deleting the head of a list."
+
+A: [Draw on whiteboard]
+
+    "Starting state:
+        doc->appointments → [Apt1] → [Apt2] → [Apt3]
+                             ^
+                            curr
+                            prev = nullptr
+    
+    We find that Apt1 is our target. Since prev is nullptr, we know this
+    is the head. We set:
+        doc->appointments = curr->next  (which is Apt2)
+    
+    Now the doctor's appointment pointer skips Apt1:
+        doc->appointments → [Apt2] → [Apt3]
+        
+        [Apt1] is orphaned (no pointers to it)
+    
+    Finally, we call delete curr to free Apt1's memory.
+    
+    Final state:
+        doc->appointments → [Apt2] → [Apt3]
+        Apt1's memory freed and returned to the system."
+
+Q8: "Why return bool instead of void?"
+
+A: "Returning a boolean lets the calling code know whether the operation
+    succeeded or failed. This is important for:
+    - Error handling: The caller can check and respond appropriately
+    - Logging: Tracking success/failure rates
+    - Testing: Automated tests can assert on the return value
+    - User experience: We can show different messages
+    
+    It follows the principle that operations that can fail should
+    communicate their status to the caller."
+
+Q9: "What's the difference between this and FindDoctor()?"
+
+A: "FindDoctor searches the BST for a specific doctor by ID and returns
+    the doctor node. It's a pure search operation.
+    
+    CancelAppointment is a search-and-modify operation. It:
+    1. Searches the entire BST (similar to FindDoctor)
+    2. Searches within each doctor's appointment list (extra step)
+    3. Modifies the list by deleting a node (mutation)
+    4. Frees memory (side effect)
+    
+    FindDoctor is read-only. CancelAppointment changes system state.
+    They serve different purposes in the system architecture."
+
+Q10: "Explain your early-exit optimization."
+
+A: "In CancelAppointmentHelper, once we find and delete the appointment,
+    we immediately return true. This causes the recursive calls to unwind
+    without searching further.
+    
+    Example: If we have 100 doctors and find the appointment in doctor #5,
+    we don't waste time checking doctors #6 through #100. The 'return true'
+    short-circuits all remaining recursion.
+    
+    This is a significant optimization because appointments are unique by ID—
+    there's no point searching further once found. Without this, we'd waste
+    time checking all 100 doctors even after successful deletion."
+
+DEMONSTRATION POINTS:
+---------------------
+
+1. DRAW THE DATA STRUCTURES:
+   Show the interviewer how the BST and linked lists interact
+
+2. TRACE A SPECIFIC EXECUTION:
+   Walk through cancelling a specific appointment with actual values
+
+3. SHOW THE MEMORY STATES:
+   Draw memory before and after deletion to demonstrate understanding
+
+4. DISCUSS TRADE-OFFS:
+   Show you understand alternatives and why you chose this design
+
+5. EXPLAIN ERROR CASES:
+   Demonstrate you've thought about what can go wrong
+
+CONFIDENCE BUILDERS:
+--------------------
+
+✓ "I tested all edge cases including empty lists and deleting the head"
+✓ "I chose this design for simplicity and maintainability"
+✓ "The time complexity could be improved but at the cost of extra memory"
+✓ "I ensured proper memory management with no leaks"
+✓ "The three-function design follows software engineering best practices"
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The CancelAppointment system demonstrates:
+
+✓ Understanding of binary search trees (recursive traversal)
+✓ Mastery of linked list operations (deletion with two-pointer technique)
+✓ Proper memory management (delete operator)
+✓ Software design principles (separation of concerns)
+✓ Error handling (graceful failure, null checks)
+✓ Algorithm analysis (time/space complexity)
+✓ Integration awareness (how it fits in the larger system)
+
+This is production-quality code suitable for:
+- Academic demonstration
+- Technical interviews
+- Viva defense
+- Resume portfolio
+
+The implementation balances:
+- Correctness (handles all cases)
+- Efficiency (early exit optimization)
+- Maintainability (clear structure)
+- Safety (no memory leaks)
+
+Total lines of code: ~60
+Readability: High
+Defensibility: Excellent
+
+================================================================================
+END OF DOCUMENT
+================================================================================

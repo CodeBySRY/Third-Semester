@@ -1,0 +1,4 @@
+Vivado Simulator 2018.2
+Time resolution is 1 ps
+SR Flipflop testbench completed
+$finish called at time : 70 ns : File "E:/home/Documents/GIKI Folder/3rd Semester/CE221 - Digital Logic Design/Verilog/SR_flipflop/SR_flipflop.srcs/sim_1/new/sr_flipflop_tb.v" Line 78
