@@ -16,8 +16,6 @@ This repository serves both as:
 - **CS202** – Communication and Information Technologies
 - **CS221** – Data Structures and Algorithms
 - **CS231** – Discrete Mathematics
-yaml
-Copy code
 
 Each folder corresponds to a single course offered during the semester.
 
