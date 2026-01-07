@@ -1,0 +1,782 @@
+================================================================================
+    BIG-O NOTATION & ALGORITHM ANALYSIS - COMPLETE EXAM GUIDE
+================================================================================
+                    Based on CS221 Practice Assignment
+================================================================================
+
+TABLE OF CONTENTS:
+==================
+1. Growth Rate Ordering (Q1)
+2. Big-O Properties and Rules (Q2, Q3)
+3. Comparing Growth Rates (Q4)
+4. Proving Complexity Bounds (Q5)
+5. Function Comparison (Q6)
+6. Loop Analysis (Q7)
+7. Algorithm Design (Q8)
+8. Scaling Analysis (Q9)
+9. Practice MCQs for Final Exam
+
+================================================================================
+SECTION 1: GROWTH RATE ORDERING (Q1)
+================================================================================
+
+QUESTION 1: Order the following functions by growth rate:
+n, √n, n^1.5, n^2, n log n, n log log n, n log² n, n log(n²), 
+2/n, 2^n, 2^(n/2), 37, n² log n, n³
+
+Indicate which functions grow at the same rate.
+
+ANSWER:
+-------
+
+FROM SLOWEST TO FASTEST GROWTH:
+
+1. 37                                   [Constant - O(1)]
+2. 2/n                                  [Decreasing function]
+3. log log n                            [Very slow growing]
+4. log n                                [Logarithmic]
+5. √n = n^0.5                          [Sublinear]
+6. n                                    [Linear]
+7. n log log n                          [Between n and n log n]
+8. n log n ≡ n log(n²)                 [SAME RATE - Linearithmic]
+9. n log² n = n(log n)²                [Between n log n and n^1.5]
+10. n^1.5                               [Superlinear]
+11. n²                                  [Quadratic]
+12. n² log n                            [Between n² and n³]
+13. n³                                  [Cubic]
+14. 2^(n/2) = √(2^n)                   [Exponential - smaller base]
+15. 2^n                                 [Exponential]
+
+FUNCTIONS THAT GROW AT THE SAME RATE:
+--------------------------------------
+✓ n log n and n log(n²) are THE SAME!
+
+Why? Because:
+   n log(n²) = n · log(n²)
+             = n · 2 log n        [log rule: log(a^b) = b log a]
+             = 2n log n
+             = O(n log n)         [constant 2 doesn't matter in Big-O]
+
+IMPORTANT HIERARCHY TO MEMORIZE:
+---------------------------------
+Constant < Log < Poly-log < Root < Linear < Linearithmic < Polynomial < Exponential < Factorial
+
+O(1) < O(log n) < O(√n) < O(n) < O(n log n) < O(n²) < O(n³) < O(2^n) < O(n!)
+
+KEY RULES:
+----------
+1. For polynomials: n^a grows faster than n^b if a > b
+2. Any polynomial grows faster than any logarithmic function
+3. Any exponential grows faster than any polynomial
+4. log^k n grows slower than n^ε for any k and any ε > 0
+
+================================================================================
+SECTION 2: BIG-O PROPERTIES - QUESTION 2
+================================================================================
+
+QUESTION 2: Suppose T1(n) = O(f(n)) and T2(n) = O(f(n)). 
+Which of the following are true?
+
+Let's analyze each statement:
+
+a) T1(n) + T2(n) = O(f(n))
+   ✓ TRUE
+   Proof: T1(n) ≤ c1·f(n) and T2(n) ≤ c2·f(n)
+          T1(n) + T2(n) ≤ (c1 + c2)·f(n) = O(f(n))
+   
+b) T1(n) - T2(n) = o(f(n))
+   ✗ FALSE
+   Counter-example: T1(n) = 2f(n), T2(n) = f(n)
+                    T1(n) - T2(n) = f(n) = O(f(n)), NOT o(f(n))
+   (Little-o means strictly smaller growth)
+
+c) T1(n) * T2(n) = O(f(n))
+   ✗ FALSE
+   Counter-example: T1(n) = f(n), T2(n) = f(n)
+                    T1(n) * T2(n) = f(n)² = O(f²(n)), NOT O(f(n))
+
+d) T1(n) / T2(n) = O(1)
+   ✗ FALSE
+   Counter-example: T1(n) = n², T2(n) = n (both are O(n²) if we consider n² as f(n))
+                    Wait, this needs clarification. Actually this is context-dependent.
+   
+e) T1(n) / T2(n) = O(f(n))
+   ✗ FALSE (not always true)
+   Could be O(1), could be unbounded depending on T1 and T2
+
+f) T1(n) * T2(n) = O(f²(n))
+   ✓ TRUE
+   Proof: T1(n) ≤ c1·f(n) and T2(n) ≤ c2·f(n)
+          T1(n) * T2(n) ≤ c1·c2·f(n)² = O(f²(n))
+
+g) T1(n) = O(T2(n))
+   ✗ FALSE (not necessarily)
+   Both are O(f(n)) but they could have different constants or lower-order terms
+
+h) T2(n) = Ω(T1(n))
+   ✗ FALSE (not necessarily)
+   Same reasoning as (g)
+
+CORRECT ANSWERS: (a) and (f) are TRUE
+
+================================================================================
+SECTION 3: BIG-O PROPERTIES - QUESTION 3
+================================================================================
+
+QUESTION 3: Suppose T1(n) = O(f(n²)) and T2(n) = O(f(n)). 
+Which of the following are true?
+
+Let's analyze:
+
+a) T1(n) + T2(n) = O(f(n))
+   ✗ FALSE
+   T1 dominates: O(f(n²)) + O(f(n)) = O(f(n²))
+
+b) T1(n) - T2(n) = o(f(n²))
+   ✗ FALSE
+   T1(n) - T2(n) could still be Θ(f(n²))
+
+c) T1(n) / T2(n) = O(1)
+   ✗ FALSE
+   T1(n) / T2(n) = O(f(n²)) / O(f(n)) = O(f(n))
+
+d) T1(n) / T2(n) = O(f(n))
+   ✓ TRUE
+   As shown above: O(f(n²)) / O(f(n)) = O(f(n))
+
+e) T1(n) / T2(n) = O(f(n²))
+   ✓ TRUE (loose bound)
+   If something is O(f(n)), it's also O(f(n²))
+
+f) T1(n) / T2(n) = O(f(n³))
+   ✓ TRUE (even looser bound)
+   Same reasoning
+
+g) T1(n) * T2(n) = O(f(n))
+   ✗ FALSE
+   O(f(n²)) * O(f(n)) = O(f(n³))
+
+h) T1(n) * T2(n) = O(f(n²))
+   ✗ FALSE
+   Would be O(f(n³))
+
+i) T1(n) * T2(n) = O(f(n³))
+   ✓ TRUE
+   O(f(n²)) * O(f(n)) = O(f(n³))
+
+j) T1(n) = O(T2(n))
+   ✗ FALSE
+   T1 grows faster than T2
+
+k) T2(n) = Ω(T1(n))
+   ✗ FALSE
+   T2 grows slower than T1
+
+l) T2(n) = o(T1(n))
+   ✓ TRUE
+   T2 grows strictly slower than T1
+
+CORRECT ANSWERS: (d), (e), (f), (i), (l) are TRUE
+TIGHTEST CORRECT BOUNDS: (d) and (i)
+
+================================================================================
+SECTION 4: COMPARING GROWTH RATES (Q4)
+================================================================================
+
+QUESTION 4: Which function grows faster?
+   n log n, or
+   n[1 + ε/√(log n)], where ε > 0
+
+ANSWER:
+-------
+n[1 + ε/√(log n)] grows FASTER
+
+PROOF:
+------
+Let f(n) = n log n
+Let g(n) = n[1 + ε/√(log n)] = n + nε/√(log n)
+
+Take the ratio:
+   g(n)/f(n) = [n + nε/√(log n)] / (n log n)
+             = 1/(log n) + ε/(log n · √(log n))
+             = 1/(log n) + ε/(log n)^(3/2)
+
+As n → ∞:
+   Both terms → 0, so g(n)/f(n) → 0... Wait, this would mean f grows faster!
+
+Let me recalculate:
+   g(n) = n · [1 + ε/√(log n)]
+        = n + n·ε/√(log n)
+
+   g(n)/f(n) = [n + n·ε/√(log n)] / (n log n)
+             = [1 + ε/√(log n)] / log n
+             = 1/log n + ε/(log n · √(log n))
+
+Hmm, as n → ∞, both terms go to 0.
+
+Actually, we need to use L'Hôpital's rule or asymptotic expansion:
+   g(n) = n[1 + ε/√(log n)]
+        ≈ n + nε/√(log n)        [for large n]
+
+The key is: nε/√(log n) vs n log n
+
+   [nε/√(log n)] / [n log n] = ε / [√(log n) · log n]
+                              = ε / (log n)^(3/2)
+                              → 0 as n → ∞
+
+So actually n log n GROWS FASTER!
+
+CORRECT ANSWER: n log n grows faster than n[1 + ε/√(log n)]
+
+================================================================================
+SECTION 5: PROVING COMPLEXITY BOUNDS (Q5)
+================================================================================
+
+QUESTION 5: Prove that for any constant k, log^k n = o(n)
+
+PROOF:
+------
+We need to show that lim(n→∞) [log^k n / n] = 0
+
+Method 1: Using L'Hôpital's Rule (k times)
+-------------------------------------------
+Apply L'Hôpital's rule k times:
+
+First application:
+   lim [log^k n / n] = lim [k·log^(k-1) n · (1/n) / 1]
+                     = lim [k·log^(k-1) n / n]
+
+Second application:
+   = lim [k(k-1)·log^(k-2) n / n]
+
+Continue k times:
+   = lim [k! / n] = 0
+
+Method 2: Direct Substitution
+------------------------------
+Let n = 2^m, so m = log₂ n
+
+Then:
+   log^k n / n = m^k / 2^m
+
+We know that for any polynomial p(m) and exponential 2^m:
+   lim(m→∞) [p(m) / 2^m] = 0
+
+Therefore: m^k / 2^m → 0, which proves log^k n = o(n)
+
+Method 3: Series Expansion
+---------------------------
+We know that e^x = 1 + x + x²/2! + x³/3! + ...
+
+For x = log n:
+   e^(log n) = n = 1 + log n + (log n)²/2! + ... + (log n)^k/k! + ...
+
+Therefore:
+   n > (log n)^k / k!
+   
+   (log n)^k < k! · n
+   
+   (log n)^k / n < k!
+   
+As n → ∞, (log n)^k / n → 0
+
+∴ log^k n = o(n)  Q.E.D.
+
+================================================================================
+SECTION 6: FUNCTION COMPARISON (Q6)
+================================================================================
+
+QUESTION 6: Find two functions f(n) and g(n) such that:
+   Neither f(n) = O(g(n)) nor g(n) = O(f(n))
+
+ANSWER:
+-------
+We need functions that oscillate or alternate dominance.
+
+EXAMPLE 1: Using Oscillation
+-----------------------------
+f(n) = n^(1 + sin n)
+g(n) = n
+
+Explanation:
+- When sin n = 1: f(n) = n², so f(n) > g(n)
+- When sin n = -1: f(n) = n⁰ = 1, so f(n) < g(n)
+- Neither dominates the other
+
+EXAMPLE 2: Using Alternating Functions
+---------------------------------------
+f(n) = n      if n is even
+       n²     if n is odd
+
+g(n) = n²     if n is even
+       n      if n is odd
+
+Explanation:
+- For even n: f(n) = n < n² = g(n)
+- For odd n: f(n) = n² > n = g(n)
+- Neither f = O(g) nor g = O(f)
+
+EXAMPLE 3: Simple Oscillation
+------------------------------
+f(n) = n · (2 + sin n)
+g(n) = n · (2 + cos n)
+
+Both oscillate between n and 3n, but not in sync.
+
+KEY CONCEPT:
+------------
+For f = O(g) to hold, f must be bounded above by g (times a constant) 
+for ALL sufficiently large n. If the functions alternate which is larger,
+neither can bound the other.
+
+================================================================================
+SECTION 7: LOOP ANALYSIS (Q7)
+================================================================================
+
+QUESTION 7: Analyze the running time for each code fragment:
+
+(1) sum = 0;
+    for(i=0; i<n; i++)
+        sum++;
+    
+    ANALYSIS: O(n)
+    - Outer loop runs n times
+    - Each iteration does O(1) work
+    - Total: n × O(1) = O(n)
+
+(2) sum = 0;
+    for(i=0; i<n; i++)
+        for(j=0; j<n; j++)
+            sum++;
+    
+    ANALYSIS: O(n²)
+    - Outer loop: n iterations
+    - Inner loop: n iterations (for each outer)
+    - Total: n × n = n² = O(n²)
+
+(3) sum = 0;
+    for(i=0; i<n; i++)
+        for(j=0; j<n*n; j++)
+            sum++;
+    
+    ANALYSIS: O(n³)
+    - Outer loop: n iterations
+    - Inner loop: n² iterations (for each outer)
+    - Total: n × n² = n³ = O(n³)
+
+(4) sum = 0;
+    for(i=0; i<n; i++)
+        for(j=0; j<i; j++)
+            sum++;
+    
+    ANALYSIS: O(n²)
+    - When i=0: inner loop runs 0 times
+    - When i=1: inner loop runs 1 time
+    - When i=2: inner loop runs 2 times
+    - ...
+    - When i=n-1: inner loop runs n-1 times
+    - Total: 0 + 1 + 2 + ... + (n-1) = n(n-1)/2 = O(n²)
+
+(5) sum = 0;
+    for(i=0; i<n; i++)
+        for(j=0; j<i*i; j++)
+            for(k=0; k<j; k++)
+                sum++;
+    
+    ANALYSIS: O(n⁵)
+    - Outer loop: n iterations
+    - Middle loop: i² iterations
+    - Inner loop: j iterations (average j ≈ i²/2)
+    - Total operations for one i:
+      ∑(j=0 to i²) j = (i²)(i²+1)/2 ≈ i⁴/2
+    - Sum over all i:
+      ∑(i=0 to n) i⁴/2 ≈ n⁵/10 = O(n⁵)
+
+(6) sum = 0;
+    for(i=1; i<n; i=i*2)
+        for(j=0; j<n; j++)
+            sum++;
+    
+    ANALYSIS: O(n log n)
+    - Outer loop: i doubles each time (1, 2, 4, 8, ...)
+    - Runs log₂ n times
+    - Inner loop: n iterations
+    - Total: log n × n = O(n log n)
+
+KEY PATTERNS:
+-------------
+1. Simple loop to n: O(n)
+2. Nested loop, both to n: O(n²)
+3. Loop with i, inner loop to i: O(n²)
+4. Loop with i, inner to i²: O(n³) or higher
+5. Loop that multiplies: O(log n)
+6. Nested loop with one log: O(n log n)
+
+================================================================================
+SECTION 8: ALGORITHM DESIGN (Q8)
+================================================================================
+
+QUESTION 8: Given a sorted array A[1..n] where A[i] < A[i+1], 
+find if there exists an integer i such that A[i] = i.
+
+SOLUTION:
+---------
+Use BINARY SEARCH!
+
+ALGORITHM:
+----------
+```
+findFixedPoint(A, low, high):
+    if low > high:
+        return -1  // No fixed point exists
+    
+    mid = (low + high) / 2
+    
+    if A[mid] == mid:
+        return mid  // Found fixed point!
+    
+    if A[mid] < mid:
+        // If A[mid] < mid, then all elements before mid
+        // will also be less than their indices (due to sorting)
+        return findFixedPoint(A, mid+1, high)
+    else:
+        // If A[mid] > mid, search in left half
+        return findFixedPoint(A, low, mid-1)
+```
+
+WHY IT WORKS:
+-------------
+Key insight: Since A is sorted with A[i] < A[i+1]:
+
+If A[mid] < mid:
+   - All A[j] for j < mid will have A[j] < mid - 1 < j
+   - So no fixed point exists in left half
+
+If A[mid] > mid:
+   - All A[j] for j > mid will have A[j] > mid + 1 > j
+   - So no fixed point exists in right half
+
+RUNNING TIME: O(log n)
+- Binary search divides search space in half each time
+- At most log₂ n comparisons
+
+EXAMPLE:
+--------
+Array: [-10, -5, 0, 3, 7, 9, 12, 17]
+Index:   0   1  2  3  4  5   6   7
+
+A[3] = 3, so i = 3 is a fixed point!
+
+Trace:
+   mid = 3, A[3] = 3 ✓ Found!
+
+================================================================================
+SECTION 9: SCALING ANALYSIS (Q9)
+================================================================================
+
+QUESTION 9: An algorithm takes 0.5 ms for input size 100.
+How large a problem can be solved in 1 minute (60,000 ms) 
+if the running time is:
+
+a) Linear: T(n) = c·n
+   -------------------------
+   T(100) = c·100 = 0.5 ms
+   c = 0.005 ms
+   
+   T(n) = 60,000 ms
+   0.005n = 60,000
+   n = 12,000,000
+   
+   ANSWER: 12 million
+
+b) Logarithmic: T(n) = c·log n
+   -------------------------
+   T(100) = c·log 100 ≈ c·6.64 = 0.5 ms
+   c ≈ 0.0753 ms
+   
+   T(n) = 60,000 ms
+   0.0753·log n = 60,000
+   log n ≈ 796,813
+   n ≈ 2^796,813 (astronomically large!)
+   
+   ANSWER: Extremely large (practically unlimited)
+
+c) O(n log n)
+   -------------------------
+   T(100) = c·100·log 100 ≈ c·664 = 0.5 ms
+   c ≈ 0.000753 ms
+   
+   T(n) = 60,000 ms
+   0.000753·n·log n = 60,000
+   n·log n ≈ 79,681,275
+   
+   Solving numerically: n ≈ 4,200,000
+   
+   ANSWER: ~4.2 million
+
+d) Quadratic: T(n) = c·n²
+   -------------------------
+   T(100) = c·100² = c·10,000 = 0.5 ms
+   c = 0.00005 ms
+   
+   T(n) = 60,000 ms
+   0.00005·n² = 60,000
+   n² = 1,200,000,000
+   n ≈ 34,641
+   
+   ANSWER: ~34,641
+
+e) Cubic: T(n) = c·n³
+   -------------------------
+   T(100) = c·100³ = c·1,000,000 = 0.5 ms
+   c = 0.0000005 ms
+   
+   T(n) = 60,000 ms
+   0.0000005·n³ = 60,000
+   n³ = 120,000,000,000
+   n ≈ 4,932
+   
+   ANSWER: ~4,932
+
+SUMMARY TABLE:
+--------------
+Complexity  | Size in 1 minute
+------------|------------------
+Linear      | 12,000,000
+Logarithmic | Virtually unlimited
+n log n     | 4,200,000
+Quadratic   | 34,641
+Cubic       | 4,932
+
+KEY INSIGHT:
+------------
+As complexity increases, problem size decreases DRAMATICALLY!
+Quadratic is ~350× smaller than linear.
+Cubic is ~7× smaller than quadratic.
+
+================================================================================
+SECTION 10: PRACTICE MCQs FOR FINAL EXAM
+================================================================================
+
+MCQ 1: What is the time complexity of the following code?
+```
+for(i=1; i<=n; i=i*2)
+    for(j=1; j<=n; j++)
+        sum++;
+```
+A) O(n)
+B) O(n log n)
+C) O(n²)
+D) O(log n)
+
+ANSWER: B) O(n log n)
+EXPLANATION: Outer loop multiplies by 2, runs log n times. Inner runs n times.
+
+---
+
+MCQ 2: Which statement is TRUE about Big-O notation?
+A) O(n) + O(n) = O(n²)
+B) O(n²) + O(n) = O(n²)
+C) O(n) × O(n) = O(n)
+D) O(n²) / O(n) = O(n²)
+
+ANSWER: B) O(n²) + O(n) = O(n²)
+EXPLANATION: Larger term dominates in addition.
+
+---
+
+MCQ 3: Order these from slowest to fastest growth:
+   I. n²    II. 2^n    III. n log n    IV. n!
+A) I, II, III, IV
+B) III, I, II, IV
+C) III, I, IV, II
+D) I, III, II, IV
+
+ANSWER: B) III, I, II, IV
+EXPLANATION: n log n < n² < 2^n < n!
+
+---
+
+MCQ 4: What is the complexity of binary search?
+A) O(n)
+B) O(log n)
+C) O(n log n)
+D) O(1)
+
+ANSWER: B) O(log n)
+EXPLANATION: Divides search space in half each time.
+
+---
+
+MCQ 5: If T(n) = 5n³ + 3n² + 2n + 1, what is the Big-O?
+A) O(n)
+B) O(n²)
+C) O(n³)
+D) O(n⁴)
+
+ANSWER: C) O(n³)
+EXPLANATION: Highest degree term dominates, constants are dropped.
+
+---
+
+MCQ 6: Which grows faster?
+A) n^1000
+B) 2^n
+C) n!
+D) All same rate
+
+ANSWER: C) n!
+EXPLANATION: n! > 2^n > n^1000 for large n.
+
+---
+
+MCQ 7: What is the complexity of this nested loop?
+```
+for(i=0; i<n; i++)
+    for(j=0; j<i; j++)
+        sum++;
+```
+A) O(n)
+B) O(n log n)
+C) O(n²)
+D) O(n³)
+
+ANSWER: C) O(n²)
+EXPLANATION: Sum from 0 to n-1 = n(n-1)/2 = O(n²)
+
+---
+
+MCQ 8: If f(n) = O(n²) and g(n) = O(n), what is f(n) × g(n)?
+A) O(n²)
+B) O(n³)
+C) O(n)
+D) O(n⁴)
+
+ANSWER: B) O(n³)
+EXPLANATION: O(n²) × O(n) = O(n³)
+
+---
+
+MCQ 9: Which is NOT true about Big-O?
+A) O(n) ⊆ O(n²)
+B) O(n²) ⊆ O(n)
+C) O(1) ⊆ O(n)
+D) O(log n) ⊆ O(n)
+
+ANSWER: B) O(n²) ⊆ O(n)
+EXPLANATION: n² grows faster than n, cannot be subset.
+
+---
+
+MCQ 10: What is the recurrence for binary search?
+A) T(n) = T(n/2) + O(1)
+B) T(n) = 2T(n/2) + O(1)
+C) T(n) = T(n-1) + O(1)
+D) T(n) = T(n/2) + O(n)
+
+ANSWER: A) T(n) = T(n/2) + O(1)
+EXPLANATION: Divides problem in half, does constant work.
+
+---
+
+MCQ 11: Which loop has O(n²) complexity?
+A) for(i=1; i<n; i*=2) sum++;
+B) for(i=0; i<n; i++) for(j=0; j<n; j++) sum++;
+C) for(i=0; i<n; i++) sum++;
+D) while(n>1) n/=2;
+
+ANSWER: B
+EXPLANATION: Nested loops, both running n times.
+
+---
+
+MCQ 12: If an algorithm is O(n log n), which is true?
+A) It's also O(n²)
+B) It's also O(n)
+C) It's also O(log n)
+D) None of above
+
+ANSWER: A) It's also O(n²)
+EXPLANATION: Big-O gives upper bound. n log n < n².
+
+---
+
+MCQ 13: What's the time complexity of this?
+```
+int power(int x, int n) {
+    if(n == 0) return 1;
+    return x * power(x, n-1);
+}
+```
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n²)
+
+ANSWER: C) O(n)
+EXPLANATION: Makes n recursive calls.
+
+---
+
+MCQ 14: Which is the tightest bound for 3n² + 2n + 1?
+A) O(n)
+B) O(n²)
+C) O(n³)
+D) O(2^n)
+
+ANSWER: B) O(n²)
+EXPLANATION: Tightest bound matches highest degree.
+
+---
+
+MCQ 15: What does little-o notation mean?
+A) Upper bound (inclusive)
+B) Upper bound (exclusive)
+C) Lower bound
+D) Exact bound
+
+ANSWER: B) Upper bound (exclusive)
+EXPLANATION: f = o(g) means f grows strictly slower than g.
+
+================================================================================
+KEY FORMULAS TO MEMORIZE:
+================================================================================
+
+1. Sum of first n numbers:
+   1 + 2 + 3 + ... + n = n(n+1)/2 = O(n²)
+
+2. Sum of squares:
+   1² + 2² + ... + n² = n(n+1)(2n+1)/6 = O(n³)
+
+3. Geometric series:
+   1 + 2 + 4 + ... + 2^k = 2^(k+1) - 1 = O(2^k)
+
+4. Logarithm rules:
+   log(ab) = log a + log b
+   log(a^b) = b log a
+   log(a/b) = log a - log b
+   log_a b = log b / log a
+
+5. Master Theorem (for recurrences):
+   T(n) = aT(n/b) + f(n)
+   - If f(n) = O(n^c) where c < log_b a: T(n) = O(n^(log_b a))
+   - If f(n) = O(n^c) where c = log_b a: T(n) = O(n^c log n)
+   - If f(n) = O(n^c) where c > log_b a: T(n) = O(f(n))
+
+================================================================================
+FINAL EXAM TIPS:
+================================================================================
+
+1. ALWAYS simplify to the HIGHEST degree term
+2. Drop constants and lower-order terms
+3. Know the hierarchy: 1 < log n < n < n log n < n² < 2^n < n!
+4. For loops: count iterations carefully
+5. For nested loops: multiply the iterations
+6. For recursive code: write the recurrence relation
+7. Big-O is UPPER bound (can be loose)
+8. Big-Omega is LOWER bound
+9. Big-Theta is TIGHT bound (both upper and lower)
+10. Practice, practice, practice!
+
+GOOD LUCK ON YOUR FINAL EXAM! 🎓
+================================================================================

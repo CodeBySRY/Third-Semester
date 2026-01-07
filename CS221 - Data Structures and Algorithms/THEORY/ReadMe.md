@@ -1,3 +1,9 @@
+> [!NOTE]
+> So basically, since I use LibreOffice (and you all should as well, since its honestly better than Word), you will have to download the raw file, and use it, for all the files with the extension, '.odt'.
+
+
+---
+
 ## AVL Tree Insertion Procedure
 
 To insert a node into an **AVL Tree**, we first perform a normal **Binary Search Tree (BST)** insertion and then restore balance if required. The complete procedure is outlined below.

@@ -1,0 +1,822 @@
+================================================================================
+        TREE-RELATED MCQs - FINAL EXAM PRACTICE (REVISED)
+================================================================================
+          Using Definition: Root at Level 1, Height = Level Number
+================================================================================
+
+IMPORTANT NOTE ON HEIGHT DEFINITION:
+------------------------------------
+In this document, we use the following convention:
+- Root node is at LEVEL 1 (not level 0)
+- Height of a node = Its level number
+- Height of tree = Height of deepest node = Number of levels
+
+This is different from the computer science standard where root is at level 0,
+but matches the definition your professor uses.
+
+================================================================================
+SECTION 1: BASIC TREE PROPERTIES
+================================================================================
+
+Q1. For a binary tree with height h, what is the MAXIMUM number of nodes?
+A) 2^h
+B) 2^h - 1
+C) 2^(h+1) - 1
+D) h
+
+ANSWER: B) 2^h - 1
+
+EXPLANATION:
+- Height h means h levels (1, 2, 3, ..., h)
+- Level 1: 1 node = 2^0
+- Level 2: 2 nodes = 2^1
+- Level 3: 4 nodes = 2^2
+- ...
+- Level h: 2^(h-1) nodes
+- Total: 1 + 2 + 4 + ... + 2^(h-1) = 2^h - 1
+
+EXAMPLE: Height h=3
+    Level 1:    O           (1 node = 2^0)
+               / \
+    Level 2:  O   O         (2 nodes = 2^1)
+             / \ / \
+    Level 3: O O O O        (4 nodes = 2^2)
+    Total: 1 + 2 + 4 = 7 = 2^3 - 1 ✓
+
+---
+
+Q2. For a binary tree with height h, what is the MINIMUM number of nodes?
+A) h
+B) h + 1
+C) 2h
+D) 2h - 1
+
+ANSWER: A) h
+
+EXPLANATION:
+- Minimum occurs when tree is completely skewed (like a linked list)
+- Each level has exactly 1 node
+- Levels: 1, 2, 3, ..., h (that's h levels)
+- Total: h nodes
+
+EXAMPLE: Height h=4
+    O       Level 1
+     \
+      O     Level 2
+       \
+        O   Level 3
+         \
+          O Level 4
+    Total: 4 = h ✓
+
+---
+
+Q3. What is the MAXIMUM height of a binary tree with n nodes?
+A) log₂ n
+B) n - 1
+C) n
+D) 2^n - 1
+
+ANSWER: C) n
+
+EXPLANATION:
+- Maximum height when tree is completely skewed
+- All n nodes form a single chain
+- Each node is at its own level
+- Height = number of nodes = n
+
+EXAMPLE: n=5 nodes
+    O       Level 1, Height = 1
+     \
+      O     Level 2, Height = 2
+       \
+        O   Level 3, Height = 3
+         \
+          O Level 4, Height = 4
+           \
+            O Level 5, Height = 5
+    Height = 5 = n ✓
+
+---
+
+Q4. What is the MINIMUM height of a binary tree with n nodes?
+A) log₂ n
+B) ⌊log₂ n⌋
+C) ⌈log₂ n⌉
+D) ⌈log₂(n+1)⌉
+
+ANSWER: D) ⌈log₂(n+1)⌉
+
+EXPLANATION:
+- Minimum height when tree is complete/balanced
+- For n nodes, minimum height = ceil(log₂(n+1))
+- This is when tree is as "wide" as possible
+
+EXAMPLE: n=7 nodes
+       O           Level 1
+      / \
+     O   O         Level 2
+    / \ / \
+   O  O O  O       Level 3
+    Height = 3 = ⌈log₂(7+1)⌉ = ⌈log₂ 8⌉ = ⌈3⌉ = 3 ✓
+
+ALTERNATIVE FORMULA: ⌊log₂ n⌋ + 1 also works
+For n=7: ⌊log₂ 7⌋ + 1 = 2 + 1 = 3 ✓
+
+---
+
+Q5. A complete binary tree with n nodes has height:
+A) Exactly ⌊log₂ n⌋
+B) Exactly ⌈log₂(n+1)⌉
+C) Exactly ⌊log₂ n⌋ + 1
+D) Exactly log₂(n+1)
+
+ANSWER: C) Exactly ⌊log₂ n⌋ + 1
+
+EXPLANATION:
+- Complete binary tree fills from left to right
+- Height = floor(log₂ n) + 1
+- Equivalently: ceil(log₂(n+1))
+
+EXAMPLE: n=6 (complete tree)
+       O           Level 1
+      / \
+     O   O         Level 2
+    / \ /
+   O  O O          Level 3
+    Height = 3 = ⌊log₂ 6⌋ + 1 = 2 + 1 = 3 ✓
+
+================================================================================
+SECTION 2: LEVEL AND NODE COUNT
+================================================================================
+
+Q6. In a binary tree, level L can have AT MOST how many nodes?
+A) L
+B) 2^(L-1)
+C) 2^L
+D) L + 1
+
+ANSWER: B) 2^(L-1)
+
+EXPLANATION:
+- Level 1: 2^0 = 1 node (root)
+- Level 2: 2^1 = 2 nodes
+- Level 3: 2^2 = 4 nodes
+- Level L: 2^(L-1) nodes
+
+---
+
+Q7. A binary tree has 15 nodes. If it's a COMPLETE binary tree, what is its height?
+A) 3
+B) 4
+C) 5
+D) 6
+
+ANSWER: B) 4
+
+EXPLANATION:
+- Height = ⌊log₂ n⌋ + 1 = ⌊log₂ 15⌋ + 1 = ⌊3.9⌋ + 1 = 3 + 1 = 4
+- OR: 2^3 = 8 ≤ 15 < 16 = 2^4, so tree uses 4 levels
+
+VISUAL:
+         O              Level 1
+        / \
+       O   O            Level 2
+      / \ / \
+     O  O O  O          Level 3
+    / \ / \ / \ /
+   O  O O O O O O       Level 4 (partially filled)
+   Total: 15 nodes, Height = 4 ✓
+
+---
+
+Q8. How many leaf nodes are there in a PERFECT binary tree of height h?
+A) h
+B) 2^h
+C) 2^(h-1)
+D) 2^h - 1
+
+ANSWER: C) 2^(h-1)
+
+EXPLANATION:
+- Perfect tree: all levels completely filled
+- All leaves are at the last level (level h)
+- Level h has 2^(h-1) nodes, all of which are leaves
+
+EXAMPLE: h=3
+       O           Level 1
+      / \
+     O   O         Level 2
+    / \ / \
+   [L][L][L][L]    Level 3: 4 leaves = 2^(3-1) = 2^2 = 4 ✓
+   [L] = Leaf node
+
+---
+
+Q9. In a binary tree with n nodes, what is the MAXIMUM number of leaf nodes?
+A) n/2
+B) ⌈n/2⌉
+C) n - 1
+D) n
+
+ANSWER: B) ⌈n/2⌉
+
+EXPLANATION:
+- Maximum leaves occur in a balanced tree
+- For n nodes, approximately half are leaves
+- Exact: ⌈n/2⌉ leaves maximum
+
+EXAMPLE: n=7 (perfect tree)
+       O           1 internal
+      / \
+     O   O         2 internal
+    / \ / \
+   L  L L  L       4 leaves
+   4 = ⌈7/2⌉ ✓
+
+---
+
+Q10. What is the relationship between leaf nodes (L) and internal nodes (I) 
+     with 2 children in a FULL binary tree?
+A) L = I
+B) L = I + 1
+C) L = I - 1
+D) L = 2I
+
+ANSWER: B) L = I + 1
+
+EXPLANATION:
+- Full binary tree: every node has 0 or 2 children
+- Count edges: Each internal node contributes 2 edges
+  Total edges from internal nodes = 2I
+- Each non-root node has exactly 1 incoming edge
+  Total edges = Total nodes - 1 = (L + I) - 1
+- Therefore: 2I = L + I - 1
+- Simplifying: L = I + 1
+
+EXAMPLE:
+       O            I = 3 (internal nodes)
+      / \
+     O   O
+    / \
+   L   L   L L      L = 4 (leaf nodes)
+   4 = 3 + 1 ✓
+
+================================================================================
+SECTION 3: TREE TYPES
+================================================================================
+
+Q11. What is a FULL binary tree?
+A) All levels are completely filled
+B) Every node has 0 or 2 children
+C) All leaves are at the same level
+D) Tree is perfectly balanced
+
+ANSWER: B) Every node has 0 or 2 children
+
+EXPLANATION:
+- Full binary tree: no node has exactly 1 child
+- Each node has either 0 children (leaf) or 2 children
+- Also called "strictly binary tree"
+
+EXAMPLE:
+       O           ✓ Full
+      / \
+     O   O
+    / \
+   O   O
+
+       O           ✗ NOT Full (middle node has 1 child)
+      / \
+     O   O
+    /
+   O
+
+---
+
+Q12. What is a COMPLETE binary tree?
+A) Every node has 0 or 2 children
+B) All levels filled except possibly the last, filled left-to-right
+C) All internal nodes have 2 children
+D) Height is minimum possible
+
+ANSWER: B) All levels filled except possibly the last, filled left-to-right
+
+EXPLANATION:
+- Complete tree: all levels full except possibly last level
+- Last level filled from LEFT to RIGHT with no gaps
+- Used in heap data structure
+
+EXAMPLE:
+       O           ✓ Complete
+      / \
+     O   O
+    / \ /
+   O  O O
+
+       O           ✗ NOT Complete (gap in last level)
+      / \
+     O   O
+    / \   \
+   O  O   O
+
+---
+
+Q13. What is a PERFECT binary tree?
+A) All leaves at same level, all internal nodes have 2 children
+B) Every node has 0 or 2 children
+C) Minimum possible height
+D) No NULL pointers
+
+ANSWER: A) All leaves at same level, all internal nodes have 2 children
+
+EXPLANATION:
+- Perfect tree: completely filled at all levels
+- Number of nodes = 2^h - 1 (always odd)
+- Most restrictive type of binary tree
+
+EXAMPLE: h=3
+       O           ✓ Perfect
+      / \
+     O   O
+    / \ / \
+   O  O O  O       
+   Total: 7 = 2^3 - 1 ✓
+
+---
+
+Q14. A perfect binary tree has 31 nodes. What is its height?
+A) 4
+B) 5
+C) 6
+D) 7
+
+ANSWER: B) 5
+
+EXPLANATION:
+- Perfect tree: n = 2^h - 1
+- 31 = 2^h - 1
+- 32 = 2^h
+- 2^5 = 2^h
+- h = 5 ✓
+
+ALTERNATIVE: 31 = 1+2+4+8+16 (levels 1,2,3,4,5) → height = 5
+
+---
+
+Q15. How many NULL pointers are in a binary tree with n nodes?
+A) n
+B) n - 1
+C) n + 1
+D) 2n
+
+ANSWER: C) n + 1
+
+EXPLANATION:
+- Each node has 2 pointer fields = 2n total pointers
+- Non-NULL pointers = edges = n - 1 (every node except root has incoming edge)
+- NULL pointers = 2n - (n - 1) = n + 1
+
+EXAMPLE: n=3
+       O           Total pointers: 6
+      / \          Non-NULL: 2 (edges)
+     O   O         NULL: 4
+    ↓ ↓ ↓ ↓
+   NULL NULL NULL NULL
+    4 = 3 + 1 ✓
+
+================================================================================
+SECTION 4: BST PROPERTIES
+================================================================================
+
+Q16. In a Binary Search Tree with n nodes, what is the WORST CASE time 
+     complexity for searching?
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n log n)
+
+ANSWER: C) O(n)
+
+EXPLANATION:
+- Worst case: BST is completely skewed (like linked list)
+- Must traverse all n nodes (height = n)
+- This is why AVL trees exist (guarantee O(log n))
+
+---
+
+Q17. What is the BEST CASE time complexity for searching in a balanced BST?
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(√n)
+
+ANSWER: B) O(log n)
+
+EXPLANATION:
+- Balanced BST has height ≈ log₂ n + 1 ≈ O(log n)
+- Search time = height = O(log n)
+- This is maintained in AVL and Red-Black trees
+
+---
+
+Q18. In a BST, what traversal gives nodes in sorted order?
+A) Preorder
+B) Inorder
+C) Postorder
+D) Level-order
+
+ANSWER: B) Inorder
+
+EXPLANATION:
+- Inorder: Left → Root → Right
+- For BST: smaller → current → larger
+- Result: sorted ascending order
+
+EXAMPLE BST:
+       5
+      / \
+     3   7
+    / \
+   1   4
+
+Inorder: 1, 3, 4, 5, 7 (sorted!) ✓
+
+---
+
+Q19. How many structurally different BSTs can be formed with n distinct keys?
+A) n!
+B) 2^n
+C) C(n) = (2n)! / ((n+1)! × n!)  [Catalan number]
+D) n²
+
+ANSWER: C) C(n) = (2n)! / ((n+1)! × n!)  [Catalan number]
+
+EXPLANATION:
+- This is the nth Catalan number
+- C(0) = 1, C(1) = 1, C(2) = 2, C(3) = 5, C(4) = 14
+- Formula: C(n) = (2n)! / ((n+1)! × n!)
+
+EXAMPLE: n=3 keys {1,2,3}
+5 different BSTs possible:
+  1      1        2      3      3
+   \      \      / \    /      /
+    2      3    1   3  1      2
+     \    /            \     /
+      3  2              2   1
+
+---
+
+Q20. In a BST with n nodes, the MINIMUM height is:
+A) 1
+B) log₂ n
+C) ⌊log₂ n⌋ + 1
+D) n
+
+ANSWER: C) ⌊log₂ n⌋ + 1
+
+EXPLANATION:
+- Minimum height when BST is balanced
+- Height = floor(log₂ n) + 1
+- Equivalently: ceil(log₂(n+1))
+
+EXAMPLE: n=7
+       4           Balanced BST
+      / \
+     2   6         Height = 3
+    / \ / \        = ⌊log₂ 7⌋ + 1
+   1  3 5  7       = 2 + 1 = 3 ✓
+
+================================================================================
+SECTION 5: AVL TREES
+================================================================================
+
+Q21. In an AVL tree, what is the maximum allowed balance factor for any node?
+A) 0
+B) 1
+C) 2
+D) Any value
+
+ANSWER: B) 1
+
+EXPLANATION:
+- AVL tree: |Balance Factor| ≤ 1
+- BF = Height(Left subtree) - Height(Right subtree)
+- Allowed: -1, 0, 1
+- If |BF| > 1: rotation needed
+
+---
+
+Q22. An AVL tree with height h has AT LEAST how many nodes?
+A) 2^h - 1
+B) h
+C) N(h) = N(h-1) + N(h-2) + 1  [Fibonacci-like]
+D) 2^(h-1)
+
+ANSWER: C) N(h) = N(h-1) + N(h-2) + 1  [Fibonacci-like]
+
+EXPLANATION:
+- Minimum nodes occur in "worst case" AVL tree
+- N(h) = 1 + N(h-1) + N(h-2)  [root + min left + min right]
+- N(1) = 1, N(2) = 2
+- This follows Fibonacci sequence closely
+
+VALUES:
+h=1: 1 node
+h=2: 2 nodes
+h=3: 4 nodes
+h=4: 7 nodes
+h=5: 12 nodes
+
+---
+
+Q23. What is the MAXIMUM height of an AVL tree with n nodes?
+A) log₂ n
+B) 1.44 log₂ n
+C) 2 log₂ n
+D) n
+
+ANSWER: B) 1.44 log₂ n
+
+EXPLANATION:
+- AVL tree height ≈ 1.44 log₂ n in worst case
+- Still O(log n), but slightly taller than perfect tree
+- More precisely: h < 1.44 log₂(n+2)
+
+---
+
+Q24. How many rotations are needed to rebalance after a single insertion in AVL?
+A) Always 1
+B) At most 1
+C) At most 2
+D) Could be O(log n)
+
+ANSWER: C) At most 2
+
+EXPLANATION:
+- Single insertion can cause at most 2 rotations
+- Cases: Single rotation (LL, RR) or Double rotation (LR, RL)
+- Single: 1 rotation
+- Double: 2 rotations
+- Never more than 2 for insertion
+
+---
+
+Q25. In AVL tree deletion, how many rotations might be needed?
+A) At most 1
+B) At most 2
+C) O(log n)
+D) O(n)
+
+ANSWER: C) O(log n)
+
+EXPLANATION:
+- Deletion can cause rotations to propagate up
+- In worst case: rotation at every level
+- Number of levels = height = O(log n)
+- Therefore: O(log n) rotations possible
+
+================================================================================
+SECTION 6: BINARY TREE TRAVERSALS
+================================================================================
+
+Q26. Given preorder: A B D E C F and inorder: D B E A F C, what is the root?
+A) A
+B) B
+C) D
+D) E
+
+ANSWER: A) A
+
+EXPLANATION:
+- First element in preorder is ALWAYS the root
+- Preorder: Root → Left → Right
+- Root = A
+
+---
+
+Q27. For a binary tree with n nodes, what is the time complexity of 
+     level-order traversal?
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n²)
+
+ANSWER: C) O(n)
+
+EXPLANATION:
+- Must visit every node exactly once
+- Use queue for level-order
+- Each node: enqueue once, dequeue once
+- Total: O(n)
+
+---
+
+Q28. Which traversal uses a stack (implicitly through recursion)?
+A) Level-order
+B) Inorder, Preorder, Postorder
+C) Morris traversal
+D) None
+
+ANSWER: B) Inorder, Preorder, Postorder
+
+EXPLANATION:
+- All DFS traversals use stack (recursion or explicit)
+- Level-order uses queue
+- Stack stores path from root to current node
+
+---
+
+Q29. For a complete binary tree stored in an array, the parent of node at 
+     index i (1-indexed) is at:
+A) i/2
+B) (i-1)/2
+C) 2i
+D) i-1
+
+ANSWER: A) i/2
+
+EXPLANATION:
+- With 1-indexed array (starting from index 1)
+- Parent of node at index i = ⌊i/2⌋
+- Left child of i = 2i
+- Right child of i = 2i + 1
+
+EXAMPLE (1-indexed):
+Index:  1  2  3  4  5  6  7
+Array: [A][B][C][D][E][F][G]
+
+       A(1)
+      /    \
+    B(2)   C(3)
+   /  \    /  \
+ D(4) E(5) F(6) G(7)
+
+Node E (index 5):
+Parent = ⌊5/2⌋ = 2 = B ✓
+
+---
+
+Q30. What is the time complexity of finding the diameter of a binary tree?
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n²)
+
+ANSWER: C) O(n)
+
+EXPLANATION:
+- Diameter: longest path between any two nodes
+- Must compute height of every subtree
+- Visit each node once
+- Time: O(n)
+
+================================================================================
+SECTION 7: HEAP PROPERTIES
+================================================================================
+
+Q31. A max-heap with n elements has its LARGEST element at:
+A) Any leaf node
+B) Root (level 1)
+C) Rightmost leaf
+D) Leftmost leaf
+
+ANSWER: B) Root (level 1)
+
+EXPLANATION:
+- Max-heap: parent ≥ children
+- Largest element must be at root
+- Root is at level 1
+- Min-heap: smallest at root
+
+---
+
+Q32. What is the time complexity to BUILD a heap from n unsorted elements?
+A) O(n)
+B) O(n log n)
+C) O(n²)
+D) O(log n)
+
+ANSWER: A) O(n)
+
+EXPLANATION:
+- Building heap using heapify: O(n)
+- Inserting n elements one by one: O(n log n)
+- Bottom-up heapify is more efficient: O(n)
+
+---
+
+Q33. In a min-heap with n elements, finding the MAXIMUM element takes:
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n log n)
+
+ANSWER: C) O(n)
+
+EXPLANATION:
+- Maximum in min-heap is at a LEAF node
+- Must check all leaves
+- Number of leaves ≈ n/2 = O(n)
+
+---
+
+Q34. A binary heap of height h has how many elements?
+A) Exactly 2^h - 1
+B) Between 2^(h-1) and 2^h - 1
+C) Exactly 2^h
+D) At least h
+
+ANSWER: B) Between 2^(h-1) and 2^h - 1
+
+EXPLANATION:
+- Heap is complete binary tree
+- Minimum nodes at height h: 2^(h-1) (only one node at last level)
+- Maximum nodes at height h: 2^h - 1 (perfect tree)
+
+EXAMPLE:
+h=3: Min = 2^2 = 4, Max = 2^3 - 1 = 7
+h=4: Min = 2^3 = 8, Max = 2^4 - 1 = 15
+
+---
+
+Q35. What is the time complexity of extracting the max from a max-heap?
+A) O(1)
+B) O(log n)
+C) O(n)
+D) O(n log n)
+
+ANSWER: B) O(log n)
+
+EXPLANATION:
+- Remove root (O(1))
+- Replace with last element (O(1))
+- Heapify down to restore heap property (O(log n))
+- Total: O(log n)
+
+================================================================================
+ANSWER KEY SUMMARY
+================================================================================
+
+Q1: B    Q11: B    Q21: B    Q31: B
+Q2: A    Q12: B    Q22: C    Q32: A
+Q3: C    Q13: A    Q23: B    Q33: C
+Q4: D    Q14: B    Q24: C    Q34: B
+Q5: C    Q15: C    Q25: C    Q35: B
+Q6: B    Q16: C    Q26: A
+Q7: B    Q17: B    Q27: C
+Q8: C    Q18: B    Q28: B
+Q9: B    Q19: C    Q29: A
+Q10: B   Q20: C    Q30: C
+
+================================================================================
+KEY FORMULAS TO MEMORIZE (with root at level 1)
+================================================================================
+
+1. MAXIMUM nodes at height h: 2^h - 1
+2. MINIMUM nodes at height h: h
+3. MAXIMUM height with n nodes: n
+4. MINIMUM height with n nodes: ⌊log₂ n⌋ + 1 = ⌈log₂(n+1)⌉
+5. Nodes at level L: 2^(L-1)
+6. NULL pointers in n-node tree: n + 1
+7. In full binary tree: Leaves = Internal nodes + 1
+8. Perfect tree with height h: 2^h - 1 nodes
+9. Parent index (1-based array): ⌊i/2⌋
+10. Left child index: 2i, Right child: 2i + 1
+
+COMPARISON TABLE: Level 0 vs Level 1 Convention
+================================================
+
+Property                    | Level 0        | Level 1
+----------------------------|----------------|------------------
+Max nodes (height h)        | 2^(h+1) - 1    | 2^h - 1
+Min nodes (height h)        | h + 1          | h
+Max height (n nodes)        | n - 1          | n
+Min height (n nodes)        | ⌊log₂ n⌋       | ⌊log₂ n⌋ + 1
+Nodes at level L            | 2^L            | 2^(L-1)
+Perfect tree (height h)     | 2^(h+1) - 1    | 2^h - 1
+Leaves in perfect tree (h)  | 2^h            | 2^(h-1)
+Array parent (0-indexed)    | ⌊(i-1)/2⌋      | N/A
+Array parent (1-indexed)    | N/A            | ⌊i/2⌋
+
+================================================================================
+EXAM TIPS WITH NEW DEFINITION
+================================================================================
+
+1. ROOT is at LEVEL 1, not level 0
+2. HEIGHT = NUMBER OF LEVELS in the tree
+3. Max nodes formula: 2^h - 1 (NOT 2^(h+1) - 1)
+4. Min height formula: ⌊log₂ n⌋ + 1 (NOT just ⌊log₂ n⌋)
+5. Level L has 2^(L-1) nodes (NOT 2^L)
+6. When using 1-indexed arrays: parent = i/2, left = 2i, right = 2i+1
+
+QUICK MENTAL CHECKS:
+--------------------
+• Tree with height 3: Max nodes = 2^3 - 1 = 7 ✓
+• Tree with 7 nodes: Min height = ⌊log₂ 7⌋ + 1 = 3 ✓
+• Level 3: Max nodes = 2^(3-1) = 4 ✓
+• Perfect tree height 4: nodes = 2^4 - 1 = 15 ✓
+
+================================================================================
+GOOD LUCK ON YOUR EXAM! 🎓
+================================================================================
